@@ -1,3 +1,9 @@
+""" To Do:
+- Convert dimensions array to a dictionary
+- Use gmesh to generate more layers through the wall
+- Add fibers to the meshes using svMultiPhysics package
+"""
+
 #To Generate the Meshes
 import numpy as np
 import pyvista as pv
@@ -5,8 +11,12 @@ import tetgen
 import os
 from scipy.spatial import cKDTree
 
+#Create finer Volume Meshes
+import gmsh
+import meshio
+
 #To generate fibers and assign them to the meshes
-import ldrb
+#import ldrb
 
 #To generate the Latin Hypercube Samples
 from scipy.stats import norm
@@ -16,9 +26,10 @@ from scipy.stats import qmc
 #Usual Height - 5-12 cm, Usual Radius - 2.1-2.95 cm,
 #Usual Thickness - 0.24-0.42 cm
 dimensions = [2.1, 2.95, 5, 12, 0.24, 0.42]
-num_meshes = 100
+num_meshes = 1
 
-def create_lv_geometry(a_in, b_in, c_in, thickness, num_pts=50):
+#USING TETGEN
+def create_lv_geometry_tet(a_in, b_in, c_in, thickness, num_pts=50):
     a_out = a_in + thickness
     b_out = b_in + thickness
     c_out = c_in + thickness
@@ -103,12 +114,12 @@ def create_lv_geometry(a_in, b_in, c_in, thickness, num_pts=50):
     assert surface.is_all_triangles, "Mesh has non-triangle faces!"
     return surface
 
-def generate_mesh_for_params(ab_in, c_in, thickness, output_dir, run_id):
+def generate_mesh_tet(ab_in, c_in, thickness, output_dir, run_id):
     os.makedirs(output_dir, exist_ok=True)
 
-    surface = create_lv_geometry(ab_in, ab_in, c_in, thickness)
+    surface = create_lv_geometry_tet(ab_in, ab_in, c_in, thickness)
   
-    # --- TETRAHEDRALIZE ---
+    #Tetrahedralize -- ONLY USE FOR create_lv_geometry, NOT create_lv_gmsh
     tet = tetgen.TetGen(surface)
     tet.tetrahedralize(switches=f"pYq1.2a0.005")
     volume = tet.grid
@@ -154,6 +165,141 @@ def generate_mesh_for_params(ab_in, c_in, thickness, output_dir, run_id):
 
         surf.save(face_path)
 
+
+#USING GMSH
+#Creates Geometry and Generates Mesh
+def generate_mesh_gmsh(ab_in, c_in, thickness, output_dir, run_id, layers_through_wall=3):
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    a_in  = ab_in
+    c_out = c_in + thickness
+    a_out = ab_in + thickness
+
+    target_size = thickness / layers_through_wall
+
+    gmsh.initialize()
+    gmsh.model.add(f"lv_{run_id}")
+
+    # --- Build outer (epi) and inner (endo) half-ellipsoids, then subtract ---
+    def half_ellipsoid(a, c):
+        vol = gmsh.model.occ.addSphere(0, 0, 0, 1)
+        gmsh.model.occ.dilate([(3, vol)], 0, 0, 0, a, a, c)
+        box = gmsh.model.occ.addBox(-a - 1, -a - 1, 0, 2*(a+1), 2*(a+1), c + 1)
+        result, _ = gmsh.model.occ.cut([(3, vol)], [(3, box)])
+        gmsh.model.occ.synchronize()
+        return result[0][1]
+
+    outer_vol = half_ellipsoid(a_out, c_out)
+    inner_vol = half_ellipsoid(a_in,  c_in)
+
+    # Wall = outer minus inner; keep inner tool so we can tag endo surface
+    wall, wall_map = gmsh.model.occ.cut(
+        [(3, outer_vol)], [(3, inner_vol)],
+        removeObject=True, removeTool=False
+    )
+    gmsh.model.occ.synchronize()
+
+    wall_tag = wall[0][1]
+
+    # --- Identify and tag boundary surfaces ---
+    # Get all surfaces bounding the wall volume
+    boundary = gmsh.model.getBoundary([(3, wall_tag)], oriented=False)
+    surf_tags = [abs(b[1]) for b in boundary]
+
+    # Classify by z-range of surface bounding box
+    endo_surfs, epi_surfs, base_surfs = [], [], []
+    for s in surf_tags:
+        xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.getBoundingBox(2, s)
+        z_range = zmax - zmin
+        z_top   = zmax
+
+        # Base sits at z~0 (flat ring at the open top)
+        if z_top > -1e-6 and z_range < target_size * 3:
+            base_surfs.append(s)
+        # Endo is smaller (inner ellipsoid radius)
+        elif xmax < (a_in + a_out) / 2:
+            endo_surfs.append(s)
+        else:
+            epi_surfs.append(s)
+
+    # Register physical groups — these are what replace the KD-tree tagging
+    pg_endo = gmsh.model.addPhysicalGroup(2, endo_surfs, tag=0)
+    pg_epi  = gmsh.model.addPhysicalGroup(2, epi_surfs,  tag=1)
+    pg_base = gmsh.model.addPhysicalGroup(2, base_surfs, tag=2)
+    pg_wall = gmsh.model.addPhysicalGroup(3, [wall_tag], tag=10)
+
+    gmsh.model.setPhysicalName(2, pg_endo, "endo")
+    gmsh.model.setPhysicalName(2, pg_epi,  "epi")
+    gmsh.model.setPhysicalName(2, pg_base, "base")
+    gmsh.model.setPhysicalName(3, pg_wall, "wall")
+
+    # --- Mesh size control ---
+    gmsh.option.setNumber("Mesh.Algorithm3D", 4)  # Frontal-Delaunay
+    gmsh.option.setNumber("Mesh.CharacteristicLengthMin", target_size * 0.8)
+    gmsh.option.setNumber("Mesh.CharacteristicLengthMax", target_size * 2.0)
+    gmsh.model.mesh.generate(3)
+
+    msh_path = os.path.join(output_dir, f"mesh_{run_id}.msh")
+    gmsh.write(msh_path)
+    gmsh.finalize()
+
+    # --- Convert to PyVista via meshio ---
+    mio = meshio.read(msh_path)
+
+    # Volume
+    tet_cells = mio.cells_dict["tetra"]
+    cell_conn  = np.hstack([np.full((len(tet_cells), 1), 4), tet_cells]).ravel()
+    cell_types = np.full(len(tet_cells), pv.CellType.TETRA)
+    volume = pv.UnstructuredGrid(cell_conn, cell_types, mio.points)
+    volume.point_data["GlobalNodeID"]   = np.arange(1, volume.n_points + 1, dtype=np.int32)
+    volume.cell_data["GlobalElementID"] = np.arange(1, volume.n_cells  + 1, dtype=np.int32)
+
+    vol_path = os.path.join(output_dir, f"mesh_{run_id}_volume.vtu")
+    volume.save(vol_path)
+    print(f"Case {run_id} — Volume: {volume.n_points} nodes, {volume.n_cells} elements")
+
+    # --- Extract and save boundary surfaces using physical group tags ---
+    # meshio stores triangle sets per physical group in cells_dict keyed by tag
+    vol_tree = cKDTree(mio.points)
+
+    for tag, name in [(0, "endo"), (1, "epi"), (2, "base")]:
+        tri_cells = None
+        for cell_block, cell_tags in zip(mio.cells, mio.cell_data.get("gmsh:physical", [[]])):
+            if cell_block.type == "triangle":
+                mask = cell_tags == tag
+                if mask.any():
+                    tri_cells = cell_block.data[mask]
+                    break
+
+        if tri_cells is None:
+            print(f"WARNING: case {run_id} no triangles found for {name}")
+            continue
+
+        faces = np.hstack([np.full((len(tri_cells), 1), 3), tri_cells]).ravel()
+        surf  = pv.PolyData(mio.points, faces)
+
+        # Remove orphaned nodes (nodes not referenced by any face)
+        surf = surf.clean(tolerance=1e-9)
+
+        # Ensure consistent winding — flip normals to point outward for epi/base,
+        # inward for endo (svMultiPhysics needs inward normals for follower pressure)
+        surf.compute_normals(inplace=True, consistent_normals=True, auto_orient_normals=True)
+        if name == "endo":
+            surf.flip_faces()  # endo normals should point inward toward the cavity
+
+        # Map GlobalNodeID from volume by coordinate lookup
+        _, idxs = vol_tree.query(surf.points)
+        surf.point_data["GlobalNodeID"]   = volume.point_data["GlobalNodeID"][idxs]
+        surf.cell_data["GlobalElementID"] = np.arange(1, surf.n_cells + 1, dtype=np.int32)
+
+        # Remove the computed normals arrays before saving — svMultiPhysics computes
+        # its own and will conflict with pre-stored normal arrays in the .vtp
+        surf.point_data.remove("Normals")
+
+        surf.save(os.path.join(output_dir, f"mesh_{run_id}_{name}.vtp"))
+        print(f"Case {run_id} — {name}: {surf.n_points} nodes, {surf.n_cells} faces")
+
 def lhsampler(radrangelow, radrangehigh, heightrangelow, heightrangehigh, thicknessrangelow, thicknessrangehigh):
     ranges = {
         'radius': (radrangelow, radrangehigh),     # Inner radius
@@ -190,14 +336,15 @@ def lhsampler(radrangelow, radrangehigh, heightrangelow, heightrangehigh, thickn
     lv_models = np.round(lv_models, decimals=3)
     return lv_models
 
+
 if __name__ == "__main__":
     # 1. Generate the meshes dynamically using cross-platform paths
-    cblresearch = os.path.join(os.path.expanduser("~"), "Documents/CBLResearch")
+    cblresearch = os.path.join(os.path.expanduser("~"), "Documents/CBLResearch-github")
     
     mesh_params = lhsampler(dimensions[0], dimensions[1], dimensions[2], dimensions[3], dimensions[4], dimensions[5])  # Example parameter ranges
 
     for case_num, mesh_param in enumerate(mesh_params):
         dir_name = os.path.join(cblresearch, f"lv_sim_cases/case_{case_num}")
 
-        generate_mesh_for_params(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num)
+        generate_mesh_gmsh(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num)
         print (f"Mesh {case_num} Generated and Fixed")
