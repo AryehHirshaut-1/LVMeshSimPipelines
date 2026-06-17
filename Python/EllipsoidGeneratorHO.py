@@ -334,7 +334,7 @@ def add_fibers_to_vtu(vol_vtu_path, f0, s0, n0, out_path):
 if __name__ == "__main__":
     case_num = "HolzapfelOgden"
     base_dir = os.path.join(os.path.expanduser("~"),
-                            f"/users/alanh/Documents/CBLResearch/lv_sim_cases/case_{case_num}")
+                            f"/users/alanh/Documents/CBLResearch/lv_sim_cases_HO/case_{case_num}")
     
     # 1. Generate the base volume and raw surface
     generate_mesh_for_params(2.5, 2.5, 10, 0.6, base_dir, case_num)
