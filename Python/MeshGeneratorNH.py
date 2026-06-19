@@ -1,7 +1,5 @@
 """ To Do:
 - Convert dimensions array to a dictionary
-- Use gmesh to generate more layers through the wall
-- Add fibers to the meshes using svMultiPhysics package
 """
 
 #To Generate the Meshes
@@ -23,14 +21,24 @@ from scipy.stats import qmc
 #Dimensions are Radius, Height, and Thickness (in that order), each with minimum and maxiumum values. 
 #Usual Height - 5-12 cm, Usual Radius - 2.1-2.95 cm,
 #Usual Thickness - 0.24-0.42 cm
-dimensions = [2.1, 2.95, 5, 12, 0.24, 0.42]
+dimensions = {
+    "Radius_Lower": 2.1,
+    "Radius_Higher": 2.95,
+    "Height_Lower": 5,
+    "Height_Higher": 12,
+    "Thickness_Lower": 0.24,
+    "Thickness_Higher": 0.42,
+}
+
 num_meshes = 100
 
 #Choose between TetGen (less detailed walls) and Gmsh (more detailed walls, longer runtime)
 type = "gmsh"
 
+
 #USING TETGEN
-def create_lv_geometry_tet(a_in, b_in, c_in, thickness, num_pts=50):
+def create_lv_geometry_tet(a_in, b_in, c_in, thickness, num_pts=50, apex_cap_frac=0.3):
+
     a_out = a_in + thickness
     b_out = b_in + thickness
     c_out = c_in + thickness
@@ -62,11 +70,15 @@ def create_lv_geometry_tet(a_in, b_in, c_in, thickness, num_pts=50):
 
     num_theta = len(theta)
 
+    # Rows of the theta grid closest to the apex (ti = 0 is nearest the tip)
+    # that get pulled out into the separate epi_apex patch.
+    apex_band_rows = max(1, int(round(num_theta * apex_cap_frac)))
+
     def grid_idx(ti, pi):
         return ti * num_phi + (pi % num_phi)
 
     faces      = []
-    face_tags  = []   # 0=endo, 1=epi, 2=base
+    face_tags  = []   # 0=endo, 1=epi, 2=base, 3=epi_apex
 
     # 1. ENDO surface (inward normals) — tag 0
     for ti in range(num_theta - 1):
@@ -78,24 +90,26 @@ def create_lv_geometry_tet(a_in, b_in, c_in, thickness, num_pts=50):
             faces += [[3, a_, c_, b_], [3, b_, c_, d_]]
             face_tags += [0, 0]
 
-    # 2. EPI surface (outward normals) — tag 1
+    # 2. EPI surface (outward normals) — tag 1, except the rows nearest
+    #    the apex, which get tag 3 (epi_apex patch)
     for ti in range(num_theta - 1):
+        epi_tag = 3 if ti < apex_band_rows else 1
         for pi in range(num_phi):
             a_ = epi_offset + grid_idx(ti,     pi)
             b_ = epi_offset + grid_idx(ti,     pi + 1)
             c_ = epi_offset + grid_idx(ti + 1, pi)
             d_ = epi_offset + grid_idx(ti + 1, pi + 1)
             faces += [[3, a_, b_, c_], [3, b_, d_, c_]]
-            face_tags += [1, 1]
+            face_tags += [epi_tag, epi_tag]
 
-    # 3. APEX cap — endo fan tag 0, epi fan tag 1
+    # 3. APEX cap — endo fan stays tag 0; epi fan joins the epi_apex patch (tag 3)
     for pi in range(num_phi):
         b_ = grid_idx(0, pi)
         c_ = grid_idx(0, pi + 1)
         faces += [[3, endo_apex_idx, c_, b_]]
         face_tags += [0]
         faces += [[3, epi_apex_idx, epi_offset + b_, epi_offset + c_]]
-        face_tags += [1]
+        face_tags += [3]
 
     # 4. BASE RING — tag 2
     for pi in range(num_phi):
@@ -115,10 +129,10 @@ def create_lv_geometry_tet(a_in, b_in, c_in, thickness, num_pts=50):
     assert surface.is_all_triangles, "Mesh has non-triangle faces!"
     return surface
 
-def generate_mesh_tet(ab_in, c_in, thickness, output_dir, run_id):
+def generate_mesh_tet(ab_in, c_in, thickness, output_dir, run_id, apex_cap_frac=0.3):
     os.makedirs(output_dir, exist_ok=True)
 
-    surface = create_lv_geometry_tet(ab_in, ab_in, c_in, thickness)
+    surface = create_lv_geometry_tet(ab_in, ab_in, c_in, thickness, apex_cap_frac=apex_cap_frac)
   
     #Tetrahedralize -- ONLY USE FOR create_lv_geometry, NOT create_lv_gmsh
     tet = tetgen.TetGen(surface)
@@ -145,13 +159,16 @@ def generate_mesh_tet(ab_in, c_in, thickness, output_dir, run_id):
 
     # --- SANITY CHECK REGION TAGS ---
     region = surf_extracted.cell_data["region"]
-    print(f"Case {run_id} — Endo: {np.sum(region==0)}, Epi: {np.sum(region==1)}, Base: {np.sum(region==2)}")
+    print(
+        f"Case {run_id} — Endo: {np.sum(region == 0)}, Epi: {np.sum(region == 1)}, "
+        f"Base: {np.sum(region == 2)}, Epi apex: {np.sum(region == 3)}"
+    )
 
     # --- BUILD COORDINATE TREE FROM VOLUME ---
     vol_tree = cKDTree(volume.points)
 
     # --- SPLIT BY REGION, ASSIGN IDs, AND SAVE ---
-    for tag, name in [(0, "endo"), (1, "epi"), (2, "base")]:
+    for tag, name in [(0, "endo"), (1, "epi"), (2, "base"), (3, "epi_apex")]:
         surf = surf_extracted.extract_cells(region == tag).extract_geometry()
 
         dists, idxs = vol_tree.query(surf.points)
@@ -169,7 +186,7 @@ def generate_mesh_tet(ab_in, c_in, thickness, output_dir, run_id):
 
 #USING GMSH
 #Creates Geometry and Generates Mesh
-def generate_mesh_gmsh(ab_in, c_in, thickness, output_dir, run_id, layers_through_wall=3):
+def generate_mesh_gmsh(ab_in, c_in, thickness, output_dir, run_id, layers_through_wall=3, apex_cap_frac=0.3):
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -225,6 +242,10 @@ def generate_mesh_gmsh(ab_in, c_in, thickness, output_dir, run_id, layers_throug
             epi_surfs.append(s)
 
     # Register physical groups — these are what replace the KD-tree tagging
+    # Note: the epi physical group still covers the *whole* epicardium here.
+    # The apex patch is split out of it later, after meshing, since carving a
+    # sub-region directly out of an OCC face would require an extra
+    # fragment/intersect step on the CAD geometry itself.
     pg_endo = gmsh.model.addPhysicalGroup(2, endo_surfs, tag=0)
     pg_epi  = gmsh.model.addPhysicalGroup(2, epi_surfs,  tag=1)
     pg_base = gmsh.model.addPhysicalGroup(2, base_surfs, tag=2)
@@ -240,12 +261,21 @@ def generate_mesh_gmsh(ab_in, c_in, thickness, output_dir, run_id, layers_throug
     gmsh.option.setNumber("Mesh.CharacteristicLengthMin", target_size * 0.8)
     gmsh.option.setNumber("Mesh.CharacteristicLengthMax", target_size * 2.0)
     try:
-        gmsh.model.mesh.generate(3)  
+        gmsh.model.mesh.generate(3)
+
+        # Verify the mesh actually has volume elements before trusting it
+        elem_types, elem_tags, _ = gmsh.model.mesh.getElements(3)
+        n_tets = sum(len(t) for t in elem_tags)
+        if n_tets == 0:
+            raise RuntimeError("3D mesh generation produced zero tetrahedra")
+
         msh_path = os.path.join(output_dir, f"mesh_{run_id}.msh")
         gmsh.write(msh_path)
         gmsh.finalize()
     except Exception as e:
-        print(f"❌ CRITICAL ERROR: Mesh {case_num} failed to generate. Skipping. Error: {e}")
+        print(f"CRITICAL ERROR: Mesh {run_id} failed to generate. Skipping. Error: {e}")
+        gmsh.finalize()  # <-- always finalize, even on failure
+        return
 
 
     # --- Convert to PyVista via meshio ---
@@ -267,6 +297,12 @@ def generate_mesh_gmsh(ab_in, c_in, thickness, output_dir, run_id, layers_throug
     # meshio stores triangle sets per physical group in cells_dict keyed by tag
     vol_tree = cKDTree(mio.points)
 
+    # Apex of the epicardium sits at (0, 0, -c_out). Triangles in the "epi"
+    # physical group whose centroid falls within apex_cap_frac * a_out of
+    # that point get split off into their own epi_apex patch below.
+    epi_apex_point  = np.array([0.0, 0.0, -c_out])
+    apex_cap_radius = apex_cap_frac * a_out
+
     for tag, name in [(0, "endo"), (1, "epi"), (2, "base")]:
         tri_cells = None
         for cell_block, cell_tags in zip(mio.cells, mio.cell_data.get("gmsh:physical", [[]])):
@@ -280,29 +316,41 @@ def generate_mesh_gmsh(ab_in, c_in, thickness, output_dir, run_id, layers_throug
             print(f"WARNING: case {run_id} no triangles found for {name}")
             continue
 
-        faces = np.hstack([np.full((len(tri_cells), 1), 3), tri_cells]).ravel()
-        surf  = pv.PolyData(mio.points, faces)
+        # Split the epicardium into the bulk patch + a small apex cap patch
+        sub_groups = [(tri_cells, name)]
+        if tag == 1:
+            centroids  = mio.points[tri_cells].mean(axis=1)
+            apex_mask  = np.linalg.norm(centroids - epi_apex_point, axis=1) < apex_cap_radius
+            sub_groups = [(tri_cells[~apex_mask], "epi"), (tri_cells[apex_mask], "epi_apex")]
 
-        # Remove orphaned nodes (nodes not referenced by any face)
-        surf = surf.clean(tolerance=1e-9)
+        for sub_tris, sub_name in sub_groups:
+            if len(sub_tris) == 0:
+                print(f"WARNING: case {run_id} no triangles found for {sub_name}")
+                continue
 
-        # Ensure consistent winding — flip normals to point outward for epi/base,
-        # inward for endo (svMultiPhysics needs inward normals for follower pressure)
-        surf.compute_normals(inplace=True, consistent_normals=True, auto_orient_normals=True)
-        if name == "endo":
-            surf.flip_faces()  # endo normals should point inward toward the cavity
+            faces = np.hstack([np.full((len(sub_tris), 1), 3), sub_tris]).ravel()
+            surf  = pv.PolyData(mio.points, faces)
 
-        # Map GlobalNodeID from volume by coordinate lookup
-        _, idxs = vol_tree.query(surf.points)
-        surf.point_data["GlobalNodeID"]   = volume.point_data["GlobalNodeID"][idxs]
-        surf.cell_data["GlobalElementID"] = np.arange(1, surf.n_cells + 1, dtype=np.int32)
+            # Remove orphaned nodes (nodes not referenced by any face)
+            surf = surf.clean(tolerance=1e-9)
 
-        # Remove the computed normals arrays before saving — svMultiPhysics computes
-        # its own and will conflict with pre-stored normal arrays in the .vtp
-        surf.point_data.remove("Normals")
+            # Ensure consistent winding — flip normals to point outward for epi/base,
+            # inward for endo (svMultiPhysics needs inward normals for follower pressure)
+            surf.compute_normals(inplace=True, consistent_normals=True, auto_orient_normals=True)
+            if sub_name == "endo":
+                surf.flip_faces()  # endo normals should point inward toward the cavity
 
-        surf.save(os.path.join(output_dir, f"mesh_{run_id}_{name}.vtp"))
-        print(f"Case {run_id} — {name}: {surf.n_points} nodes, {surf.n_cells} faces")
+            # Map GlobalNodeID from volume by coordinate lookup
+            _, idxs = vol_tree.query(surf.points)
+            surf.point_data["GlobalNodeID"]   = volume.point_data["GlobalNodeID"][idxs]
+            surf.cell_data["GlobalElementID"] = np.arange(1, surf.n_cells + 1, dtype=np.int32)
+
+            # Remove the computed normals arrays before saving — svMultiPhysics computes
+            # its own and will conflict with pre-stored normal arrays in the .vtp
+            surf.point_data.remove("Normals")
+
+            surf.save(os.path.join(output_dir, f"mesh_{run_id}_{sub_name}.vtp"))
+            print(f"Case {run_id} — {sub_name}: {surf.n_points} nodes, {surf.n_cells} faces")
 
 def lhsampler(radrangelow, radrangehigh, heightrangelow, heightrangehigh, thicknessrangelow, thicknessrangehigh):
     ranges = {
@@ -342,17 +390,29 @@ def lhsampler(radrangelow, radrangehigh, heightrangelow, heightrangehigh, thickn
 
 
 if __name__ == "__main__":
-    # 1. Generate the meshes dynamically using cross-platform paths
+    
+    #
     cblresearch = os.path.join(os.path.expanduser("~"), "Documents/CBLResearch-github")
     
-    mesh_params = lhsampler(dimensions[0], dimensions[1], dimensions[2], dimensions[3], dimensions[4], dimensions[5])  # Example parameter ranges
+    #Perform the Latin Hypercube Sampling
+    mesh_params = lhsampler(dimensions["Radius_Lower"], dimensions["Radius_Higher"], dimensions["Height_Lower"], dimensions["Height_Higher"], dimensions["Thickness_Lower"], dimensions["Thickness_Higher"])  # Example parameter ranges
 
+    #Generates the Meshes
     for case_num, mesh_param in enumerate(mesh_params):
         dir_name = os.path.join(cblresearch, f"lv_sim_cases/case_{case_num}")
 
         #Change between gmsh and tet
         if type == "gmsh":
-            generate_mesh_gmsh(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num)
+            generate_mesh_gmsh(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num, apex_cap_frac=apex_cap_frac)
         elif type == "tet":
-            generate_mesh_tet(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num)
+            generate_mesh_tet(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num, apex_cap_frac=apex_cap_frac)
         print (f"Mesh {case_num} Generated and Fixed")
+
+    #Removes the unneeded .msh files
+    for file in range(0, num_meshes):
+        try:
+            dir_remove_name = os.path.join(cblresearch, f"lv_sim_cases/case_{file}")
+            os.remove(os.path.join(dir_remove_name, f"mesh_{file}.msh"))
+            print(f"mesh_{file}.msh removed!")
+        except:
+            print(f"mesh_{file}.msh already removed!")

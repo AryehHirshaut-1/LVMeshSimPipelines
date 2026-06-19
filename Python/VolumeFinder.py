@@ -3,73 +3,102 @@ import numpy as np
 import glob
 import matplotlib.pyplot as plt
 import warnings
+from pathlib import Path
+import os
 
 warnings.filterwarnings('ignore', category=pv.PyVistaFutureWarning)
 
-# Load reference meshes to find endo node indices
-ref_volume = pv.read('/users/alanh/Documents/CBLResearch/lv_sim_cases/case_1/mesh_1_volume.vtu')
-endo_ref = pv.read('/users/alanh/Documents/CBLResearch/lv_sim_cases/case_1/mesh_1_endo.vtp')
+#Mesh Folder Number (Starts at 0)
+#Material Type - Either NH (Neo-Hookean) or HO (Holzapfel-Ogden)
+file_num = 0
+material_type = "HO"
 
-ref_points = np.round(ref_volume.points, 4)
-endo_points = np.round(endo_ref.points, 4)
-endo_set = set(map(tuple, endo_points))
-endo_indices = np.array([i for i, p in enumerate(ref_points)
-                         if tuple(p) in endo_set])
-print(f"Found {len(endo_indices)} endo nodes")
+def volume_extract(file_num, material_type):
+    # Load reference meshes to find endo node indices
+    ref_volume = pv.read(f'/users/alanh/Documents/CBLResearch-github/lv_sim_cases/case_{file_num}/mesh_{file_num}_volume.vtu')
+    endo_ref = pv.read(f'/users/alanh/Documents/CBLResearch-github/lv_sim_cases/case_{file_num}/mesh_{file_num}_endo.vtp')
 
-# --- MODIFIED HERE: Sliced [1:-1] to exclude first and last files ---
-files = sorted(glob.glob('/users/alanh/Documents/CBLResearch/results/result_*.vtu'))[1:-1]
-volumes = []
 
-for f in files:
-    mesh = pv.read(f)
 
-    # Warp the mesh by displacement to get true deformed geometry
-    displacement = mesh.point_data['Displacement']
-    deformed = mesh.copy(deep=True)
-    deformed.points = mesh.points + displacement
+    ref_points = np.round(ref_volume.points, 4)
+    endo_points = np.round(endo_ref.points, 4)
+    endo_set = set(map(tuple, endo_points))
+    endo_indices = np.array([i for i, p in enumerate(ref_points)
+                            if tuple(p) in endo_set])
+    print(f"Found {len(endo_indices)} endo nodes")
 
-    # Extract deformed surface
-    surface = deformed.extract_surface(algorithm='dataset_surface')
-    orig_ids = surface.point_data['vtkOriginalPointIds']
 
-    endo_index_set = set(endo_indices)
-    surface_endo_mask = np.array([pid in endo_index_set for pid in orig_ids])
+    #Rename files if they contain the wrong name
+    folder = f"/users/alanh/Documents/CBLResearch-github/results_{material_type}/"
+    for filename in os.listdir(folder):
+        if filename.startswith(f"results_{material_type}_") and filename.endswith(".vtu"):
+            new_filename = f"result_{material_type}" + filename[len(f"result_{material_type}_"):]
+            os.rename(
+                os.path.join(folder, filename),
+                os.path.join(folder, new_filename)
+        )
+            print(f"Renamed: {filename} → {new_filename}")
 
-    endo_surf = surface.extract_points(surface_endo_mask, adjacent_cells=True)
-    endo_surf = endo_surf.extract_surface()
-    endo_surf = endo_surf.triangulate()
+    # --- MODIFIED HERE: Sliced [1:-1] to exclude first and last files ---
+    files = sorted(glob.glob(f'/users/alanh/Documents/CBLResearch-github/results_{material_type}/result_{material_type}_*.vtu'))[1:-1]
 
-    endo_closed = endo_surf.fill_holes(1000)
-    endo_closed = endo_closed.triangulate()
+    volumes = []
 
-    vol = endo_closed.volume
-    volumes.append(vol)
+    for f in files:
+        mesh = pv.read(f)
 
-np.savetxt('/users/alanh/Documents/CBLResearch/lv_volumes.csv', np.array(volumes), fmt='%.2f')
+        # Warp the mesh by displacement to get true deformed geometry
+        displacement = mesh.point_data['Displacement']
+        deformed = mesh.copy(deep=True)
+        deformed.points = mesh.points + displacement
+
+        # Extract deformed surface
+        surface = deformed.extract_surface(algorithm='dataset_surface')
+        orig_ids = surface.point_data['vtkOriginalPointIds']
+
+        endo_index_set = set(endo_indices)
+        surface_endo_mask = np.array([pid in endo_index_set for pid in orig_ids])
+
+        endo_surf = surface.extract_points(surface_endo_mask, adjacent_cells=True)
+        endo_surf = endo_surf.extract_surface()
+        endo_surf = endo_surf.triangulate()
+
+        endo_closed = endo_surf.fill_holes(1000)
+        endo_closed = endo_closed.triangulate()
+
+        vol = endo_closed.volume
+        volumes.append(vol)
+
+    np.savetxt(f'/users/alanh/Documents/CBLResearch-github/lv_volumes_{file_num}_{material_type}.csv', np.array(volumes), fmt='%.2f')
+    return volumes
 
 
 # Plotting generated volume vs. time data
 # (times will automatically adjust to the new, shorter length of volumes)
+volumes = volume_extract(file_num, "HO")
+
 times = np.arange(1, len(volumes) + 1) * 0.00813
 
-dat_times =     [0.00000, 1.61780]
-dat_pressures = [0.0,     20000.0]
+dat_times =     [0.00000,  0.87800, 1.61780]
+dat_pressures = [0.0,     67273.61, 0.0]
 pressures = np.interp(times, dat_times, dat_pressures)
 
-fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
 
-axs[0].plot(volumes, pressures, markersize=3)
-axs[0].set_xlabel('Volume (cm³)')
-axs[0].set_ylabel('Pressure (dyne/cm²)')
-axs[0].set_title('Pressure-Volume Loop')
-axs[0].grid(True)
+ax1.plot(volumes, pressures, markersize=3, label="NH")
+#ax1.plot(volumes1, pressures, markersize=3, color="orange", label="HO")
+ax1.set_xlabel('Volume (cm³)')
+ax1.set_ylabel('Pressure (dyne/cm²)')
+ax1.set_title('Pressure-Volume Loop')
+ax1.grid(True)
+ax1.legend()
 
-axs[1].plot(times, volumes, color='orange', markersize=3)
-axs[1].set_xlabel('Time (s)')
-axs[1].set_ylabel('Volume (cm³)')
-axs[1].set_title('Volume vs. Time')
-axs[1].grid(True)
+ax2.plot(times, volumes, markersize=3)
+#ax2.plot(times, volumes1, color='orange', markersize=3)
+ax2.set_xlabel('Time (s)')
+ax2.set_ylabel('Volume (cm³)')
+ax2.set_title('Volume vs. Time')
+ax2.grid(True)
 
-plt.savefig('/users/alanh/Documents/CBLResearch/pv_loop.png', dpi=300)
+plt.savefig('/users/alanh/Documents/CBLResearch-github/pv_loop.png', dpi=300)
 plt.show()
