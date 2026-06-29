@@ -1,7 +1,3 @@
-""" To Do:
-- Convert dimensions array to a dictionary
-"""
-
 #To Generate the Meshes
 import numpy as np
 import pyvista as pv
@@ -30,7 +26,7 @@ dimensions = {
     "Thickness_Higher": 0.42,
 }
 
-num_meshes = 100
+num_meshes = 1
 
 #Choose between TetGen (less detailed walls) and Gmsh (more detailed walls, longer runtime)
 type = "gmsh"
@@ -320,7 +316,7 @@ def generate_mesh_gmsh(ab_in, c_in, thickness, output_dir, run_id, layers_throug
         if tag == 1:
             centroids  = mio.points[tri_cells].mean(axis=1)
             apex_mask  = np.linalg.norm(centroids - epi_apex_point, axis=1) < apex_cap_radius
-            sub_groups = [(tri_cells[~apex_mask], "epi"), (tri_cells[apex_mask], "epi_apex")]
+            sub_groups = [(tri_cells, "epi"), (tri_cells[apex_mask], "epi_apex")]
 
         for sub_tris, sub_name in sub_groups:
             if len(sub_tris) == 0:
@@ -387,7 +383,7 @@ def lhsampler(radrangelow, radrangehigh, heightrangelow, heightrangehigh, thickn
     lv_models = np.round(lv_models, decimals=3)
     return lv_models
 
-
+#Change File Paths to Generate Meshes in Different Folders
 if __name__ == "__main__":
     
     #
@@ -402,9 +398,9 @@ if __name__ == "__main__":
 
         #Change between gmsh and tet
         if type == "gmsh":
-            generate_mesh_gmsh(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num, apex_cap_frac=apex_cap_frac)
+            generate_mesh_gmsh(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num, apex_cap_frac=0.3)
         elif type == "tet":
-            generate_mesh_tet(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num, apex_cap_frac=apex_cap_frac)
+            generate_mesh_tet(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num)
         print (f"Mesh {case_num} Generated and Fixed")
 
     #Removes the unneeded .msh files

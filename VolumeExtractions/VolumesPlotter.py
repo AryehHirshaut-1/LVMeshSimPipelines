@@ -6,6 +6,7 @@ import glob
 import os
 import re
 
+#Change these to wanted pressure volume data
 volumes_dir = r"C:\Users\alanh\Documents\CBLResearch-github\VolumeConvergence\results"
 pressure_path = r"C:\Users\alanh\Documents\CBLResearch-github\dat\lv_pressure.dat"
 
@@ -38,5 +39,6 @@ plt.title("Pressure Volume Loops — All Cases")
 plt.grid(True)
 plt.legend()
 
+#Change this line to choose where file is saved
 plt.savefig(r"C:\Users\alanh\Documents\CBLResearch-github\VolumeConvergence\PVLoop_VolCon.png", dpi=300)
 plt.show()
