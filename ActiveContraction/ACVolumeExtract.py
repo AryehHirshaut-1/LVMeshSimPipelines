@@ -14,8 +14,8 @@ warnings.filterwarnings('ignore', category=pv.PyVistaFutureWarning)
 file_num = 0
 def volume_extract(file_num):
     # Load reference meshes to find endo node indices
-    ref_volume = pv.read(f'/users/alanh/Documents/CBLResearch-github/ActiveContraction/lv_sim_cases/ActiveSimCase/mesh_{file_num}_volume.vtu')
-    endo_ref = pv.read(f'/users/alanh/Documents/CBLResearch-github//ActiveContraction/lv_sim_cases/ActiveSimCase/mesh_{file_num}_endo.vtp')
+    ref_volume = pv.read(f'/users/alanh/Documents/CBLResearch-github/ActiveContraction/lv_sim_cases/ActiveSimCase/case_{file_num}/mesh_{file_num}_volume.vtu')
+    endo_ref = pv.read(f'/users/alanh/Documents/CBLResearch-github/ActiveContraction/lv_sim_cases/ActiveSimCase/case_{file_num}/mesh_{file_num}_endo.vtp')
 
 
 
@@ -79,15 +79,16 @@ pressurefile = pd.read_csv(pressure_path, sep=r'\s+', header=0)
 pressures = pressurefile.iloc[:, 1]
 
 volumes = volume_extract(0)
+times = np.arange(1, len(volumes) + 1) * 0.00813
 
 
 
 # Align lengths in case volumes/pressures differ by one row (as seen before)
-n = min(len(volumes), len(pressures))
-v = volumes[:n]
-p = pressures[:n]
+# n = min(len(volumes), len(pressures))
+# v = volumes[:n]
+# p = pressures[:n]
 
-plt.plot(v, p, markersize=3)
+plt.plot(times, volumes, markersize=3)
 plt.xlabel('Volume (cm³)')
 plt.ylabel('Pressure (dyne/cm²)')
 plt.title("Active Contraction PV Loop")

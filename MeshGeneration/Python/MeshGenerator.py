@@ -22,13 +22,16 @@ dimensions = {
     "Radius_Higher": 2.95,
     "Height_Lower": 5,
     "Height_Higher": 12,
-    "Thickness_Lower": 0.24,
-    "Thickness_Higher": 0.42,
+    "Thickness_Lower": 0.6,
+    "Thickness_Higher": 1.1,
 }
 
 num_meshes = 1
 
-#Choose between TetGen (less detailed walls) and Gmsh (more detailed walls, longer runtime)
+#General Path to Generated Mesh Directory
+cblresearch = os.path.join(os.path.expanduser("~"), "Documents/CBLResearch-github/0DModeling/3D-0DCoupling")
+
+#Choose between TetGen (less detailed volume mesh) and Gmsh (more detailed mesh, longer runtime)
 type = "gmsh"
 
 #USING TETGEN
@@ -385,16 +388,13 @@ def lhsampler(radrangelow, radrangehigh, heightrangelow, heightrangehigh, thickn
 
 #Change File Paths to Generate Meshes in Different Folders
 if __name__ == "__main__":
-    
-    #
-    cblresearch = os.path.join(os.path.expanduser("~"), "Documents/CBLResearch-github")
-    
+        
     #Perform the Latin Hypercube Sampling
     mesh_params = lhsampler(dimensions["Radius_Lower"], dimensions["Radius_Higher"], dimensions["Height_Lower"], dimensions["Height_Higher"], dimensions["Thickness_Lower"], dimensions["Thickness_Higher"])  # Example parameter ranges
 
     #Generates the Meshes
     for case_num, mesh_param in enumerate(mesh_params):
-        dir_name = os.path.join(cblresearch, f"lv_sim_cases/case_{case_num}")
+        dir_name = os.path.join(cblresearch, f"case_{case_num}")
 
         #Change between gmsh and tet
         if type == "gmsh":
@@ -406,7 +406,7 @@ if __name__ == "__main__":
     #Removes the unneeded .msh files
     for file in range(0, num_meshes):
         try:
-            dir_remove_name = os.path.join(cblresearch, f"lv_sim_cases/case_{file}")
+            dir_remove_name = os.path.join(cblresearch, f"case_{file}")
             os.remove(os.path.join(dir_remove_name, f"mesh_{file}.msh"))
             print(f"mesh_{file}.msh removed!")
         except:

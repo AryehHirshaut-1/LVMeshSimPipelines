@@ -6,7 +6,7 @@ from scipy.stats import qmc  # Quasi-Monte Carlo submodule
 ranges = {
     'radius': (2.1, 2.95),     # Inner radius
     'height': (5, 12),     # Distance from apex to base
-    'thickness': (0.24, 0.42)    # Myocardial wall thickness
+    'thickness': (0.6, 1.1)    # Myocardial wall thickness
 }
 
 num_samples = 100
@@ -30,7 +30,7 @@ for i, var in enumerate(var_names):
     # Transform using the percent point function (inverse CDF)
     raw_samples = norm.ppf(lhs_samples[:, i], loc=mu, scale=sigma)
     
-    # ADDITION: Cap the values exactly at the defined range bounds
+    #Cap the values exactly at the defined range bounds
     vmin, vmax = ranges[var]
     lv_models[:, i] = np.clip(raw_samples, a_min=vmin, a_max=vmax)
 

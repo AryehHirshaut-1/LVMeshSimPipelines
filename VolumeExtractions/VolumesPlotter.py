@@ -7,8 +7,8 @@ import os
 import re
 
 #Change these to wanted pressure volume data
-volumes_dir = r"C:\Users\alanh\Documents\CBLResearch-github\VolumeConvergence\results"
-pressure_path = r"C:\Users\alanh\Documents\CBLResearch-github\dat\lv_pressure.dat"
+volumes_dir = r"C:\Users\alanh\Documents\CBLResearch-github\VolumeExtractions\VolumesCSV"
+pressure_path = r"C:\Users\alanh\Documents\CBLResearch-github\MeshGeneration\dat\lv_pressure.dat"
 
 # Find all case_*.csv files and sort them numerically by case number
 csv_files = glob.glob(os.path.join(volumes_dir, "case_*.csv"))
@@ -40,5 +40,5 @@ plt.grid(True)
 plt.legend()
 
 #Change this line to choose where file is saved
-plt.savefig(r"C:\Users\alanh\Documents\CBLResearch-github\VolumeConvergence\PVLoop_VolCon.png", dpi=300)
+plt.savefig(r"C:\Users\alanh\Documents\CBLResearch-github\VolumeExtractions\\100PVLoop.png", dpi=300)
 plt.show()
