@@ -73,5 +73,5 @@ for i, var in enumerate(var_names):
 
 # Adjust layout so labels don't overlap
 plt.tight_layout()
-plt.savefig('/users/alanh/Documents/CBLResearch/Python/lv_model_parameters.png', dpi=300)  # Save the figure as a high-resolution PNG
+plt.savefig('/users/alanh/Documents/CBLResearch-github/3DModeling/MeshGeneration/Python/lv_model_parameters.png', dpi=300)  # Save the figure as a high-resolution PNG
 plt.show()

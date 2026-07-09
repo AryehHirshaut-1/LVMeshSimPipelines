@@ -14,8 +14,8 @@ warnings.filterwarnings('ignore', category=pv.PyVistaFutureWarning)
 file_num = 0
 def volume_extract(file_num):
     # Load reference meshes to find endo node indices
-    ref_volume = pv.read(f'/users/alanh/Documents/CBLResearch-github/ActiveContraction/lv_sim_cases/ActiveSimCase/case_{file_num}/mesh_{file_num}_volume.vtu')
-    endo_ref = pv.read(f'/users/alanh/Documents/CBLResearch-github/ActiveContraction/lv_sim_cases/ActiveSimCase/case_{file_num}/mesh_{file_num}_endo.vtp')
+    ref_volume = pv.read(f'/users/alanh/Documents/CBLResearch-github/3DModeling/ActiveContraction/lv_sim_cases/ActiveSimCase/case_{file_num}/mesh_{file_num}_volume.vtu')
+    endo_ref = pv.read(f'/users/alanh/Documents/CBLResearch-github/3DModeling/ActiveContraction/lv_sim_cases/ActiveSimCase/case_{file_num}/mesh_{file_num}_endo.vtp')
 
 
 
@@ -28,7 +28,7 @@ def volume_extract(file_num):
 
 
     #Rename files if they contain the wrong name
-    folder = f"/users/alanh/Documents/CBLResearch-github/ActiveContraction/ACresults/ActiveSimNVResults/"
+    folder = f"/users/alanh/Documents/CBLResearch-github/3DModeling/ActiveContraction/ACresults/ActiveSimNVResults/"
     for filename in os.listdir(folder):
         if filename.startswith(f"results_") and filename.endswith(".vtu"):
             new_filename = f"result" + filename[len(f"result"):]
@@ -39,7 +39,7 @@ def volume_extract(file_num):
             print(f"Renamed: {filename} → {new_filename}")
 
     # --- MODIFIED HERE: Sliced [1:-1] to exclude first and last files ---
-    files = sorted(glob.glob(f"/users/alanh/Documents/CBLResearch-github/ActiveContraction/ACresults/ActiveSimNVResults/ACresult_*.vtu"))[1:-1]
+    files = sorted(glob.glob(f"/users/alanh/Documents/CBLResearch-github/3DModeling/ActiveContraction/ACresults/ActiveSimNVResults/ACresult_*.vtu"))[1:-1]
 
     volumes = []
 
@@ -68,12 +68,12 @@ def volume_extract(file_num):
         vol = endo_closed.volume
         volumes.append(vol)
 
-    np.savetxt(f"/users/alanh/Documents/CBLResearch-github/ActiveContraction/dat/ACNVLV_extractedvolumes_{file_num}.csv", np.array(volumes), fmt='%.2f')
+    np.savetxt(f"/users/alanh/Documents/CBLResearch-github/3DModeling/ActiveContraction/dat/ACNVLV_extractedvolumes_{file_num}.csv", np.array(volumes), fmt='%.2f')
     return volumes
 
 
-volumes_dir = r"C:\Users\alanh\Documents\CBLResearch-github\ActiveContraction"
-pressure_path = r"C:\Users\alanh\Documents\CBLResearch-github\ActiveContraction\dat\pressure_scaled.dat"
+volumes_dir = r"C:\Users\alanh\Documents\CBLResearch-github\3DModeling/ActiveContraction"
+pressure_path = r"C:\Users\alanh\Documents\CBLResearch-github\3DModeling\ActiveContraction\dat\pressure_scaled.dat"
 
 pressurefile = pd.read_csv(pressure_path, sep=r'\s+', header=0)
 pressures = pressurefile.iloc[:, 1]
@@ -89,11 +89,11 @@ times = np.arange(1, len(volumes) + 1) * 0.00813
 # p = pressures[:n]
 
 plt.plot(times, volumes, markersize=3)
-plt.xlabel('Volume (cm³)')
-plt.ylabel('Pressure (dyne/cm²)')
-plt.title("Active Contraction PV Loop")
+plt.xlabel('Time (s)')
+plt.ylabel('Volume (cm³)')
+plt.title("Volume vs Time")
 plt.grid(True)
 
 #Change this line to choose where file is saved
-plt.savefig(r"C:\Users\alanh\Documents\CBLResearch-github\ActiveContraction\ACNVPVLoop.png", dpi=300)
-plt.show()
+plt.savefig(r"C:\Users\alanh\Documents\CBLResearch-github\3DModeling\ActiveContraction\ACNVPVLoop.png", dpi=300)
+#plt.show()

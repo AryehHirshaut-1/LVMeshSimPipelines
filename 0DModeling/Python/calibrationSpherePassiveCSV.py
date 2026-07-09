@@ -15,16 +15,15 @@ MATERIAL_MODEL = "HO"
 #   row 1 = time
 #   row 2 = pressure
 #   row 3 = volume
-CSV_PATH = "0DModeling/SampleInputData/time_pressure_volume.csv"
 
 # Numerical options
 NORMALIZE_COST = True # divide residuals by sqrt(N)*max(Pout) -> dimensionless RMS relative cost
-MAKE_LANDSCAPE_PLOT = True
+MAKE_LANDSCAPE_PLOT = False
 PLOT_RESIDUAL_TERMS = False
 
 # Toggle to compare the fitted model against the uploaded/input data.
 # This only makes plots; it does not print metrics or export files.
-PLOT_FITTED_MODEL_VS_DATA = True
+PLOT_FITTED_MODEL_VS_DATA = False
 
 # Which points to fit. For an imaging-derived passive inflation curve,
 # it is often better to fit only the inflation limb.
@@ -298,9 +297,13 @@ def spherical_stress(C, Cdot, tau_vec, model, params):
     )
 
 
+
+
 # ============================================================
 # LOAD DATA
 # ============================================================
+
+CSV_PATH = "0DModeling/SampleInputData/time_pressure_volume.csv"
 
 time, Pout, volume = load_time_pressure_volume_from_csv(CSV_PATH)
 
@@ -461,6 +464,21 @@ def plot_residual_terms(theta, title="Residual term contributions"):
     print(f"  residual  RMS: {rms(res):.3e}")
     print()
 
+def residual_theta_logged(theta):
+    """
+    Wrapper that logs the optimization path.
+    """
+    global _last_theta
+
+    theta = np.asarray(theta, dtype=float)
+
+    if _last_theta is None or np.linalg.norm(theta - _last_theta) > 1e-12:
+        r = residual_theta(theta)
+        trajectory.append(theta.copy())
+        cost_traj.append(float(np.linalg.norm(r)))
+        _last_theta = theta.copy()
+
+    return residual_theta(theta)
 
 # ============================================================
 # OPTIMIZATION
@@ -483,21 +501,7 @@ if PLOT_RESIDUAL_TERMS:
     plot_residual_terms(theta_init, title="Initial guess term contributions")
 
 
-def residual_theta_logged(theta):
-    """
-    Wrapper that logs the optimization path.
-    """
-    global _last_theta
 
-    theta = np.asarray(theta, dtype=float)
-
-    if _last_theta is None or np.linalg.norm(theta - _last_theta) > 1e-12:
-        r = residual_theta(theta)
-        trajectory.append(theta.copy())
-        cost_traj.append(float(np.linalg.norm(r)))
-        _last_theta = theta.copy()
-
-    return residual_theta(theta)
 
 
 sol = least_squares(
@@ -675,6 +679,7 @@ def plot_fitted_model_against_data(plot_result):
     #plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
+    plt.savefig("0DModeling/calibrated0DModel.png", dpi=300)
     plt.show()
 
     # plt.figure(figsize=(8, 5))
