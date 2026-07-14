@@ -15,6 +15,9 @@ from scipy.stats import qmc
 #Create CSV with Mesh Parameters
 import csv
 
+#To Vary One Parameter at a Time
+from scipy.stats import truncnorm
+
 #Dimensions are Radius, Height, and Thickness (in that order), each with minimum and maxiumum values. 
 #Usual Height - 5-12 cm, Usual Radius - 2.1-2.95 cm,
 #Usual Thickness - 0.24-0.42 cm
@@ -27,7 +30,7 @@ dimensions = {
     "Thickness_Higher": 1.1,
 }
 
-num_meshes = 100
+num_meshes = 90
 
 #General Path to Generated Mesh Directory
 cblresearch = os.path.join(os.path.expanduser("~"), "Documents/CBLResearch-github/HOPipeline/3D")
@@ -241,24 +244,67 @@ def lhsampler(radrangelow, radrangehigh, heightrangelow, heightrangehigh, thickn
             writer.writerow([i] + row.tolist())
     return lv_models
 
-
 if __name__ == "__main__":
         
     #Perform the Latin Hypercube Sampling
-    mesh_params = lhsampler(dimensions["Radius_Lower"], dimensions["Radius_Higher"], dimensions["Height_Lower"], dimensions["Height_Higher"], dimensions["Thickness_Lower"], dimensions["Thickness_Higher"])  # Example parameter ranges
+    #mesh_params_thick = lhsampler(dimensions["Radius_Lower"], dimensions["Radius_Higher"], dimensions["Height_Lower"], dimensions["Height_Higher"], dimensions["Thickness_Lower"], dimensions["Thickness_Higher"])  # Example parameter ranges
+
+    n_third = num_meshes // 3  # 30
+
+    # constants to hold each param at while others vary — pick sensible fixed values
+    radius_default = 2.5     # or hardcode e.g. 2.5
+    height_default = 8.5     # or hardcode e.g. 8.5
+    thickness_default = 0.85 # or hardcode e.g. 0.85
+
+    radiusRange = np.linspace(dimensions["Radius_Lower"], dimensions["Radius_Higher"], n_third)
+    heightRange = np.linspace(dimensions["Height_Lower"], dimensions["Height_Higher"], n_third)
+    thicknessRange = np.linspace(dimensions["Thickness_Lower"], dimensions["Thickness_Higher"], n_third)
+
+    # Block 1: vary radius, height & thickness constant
+    block1 = np.column_stack([
+        radiusRange,
+        np.full(n_third, height_default),
+        np.full(n_third, thickness_default)
+    ])
+
+    # Block 2: vary height, radius & thickness constant
+    block2 = np.column_stack([
+        np.full(n_third, radius_default),
+        heightRange,
+        np.full(n_third, thickness_default)
+    ])
+
+    # Block 3: vary thickness, radius & height constant
+    block3 = np.column_stack([
+        np.full(n_third, radius_default),
+        np.full(n_third, height_default),
+        thicknessRange
+    ])
+
+    params = np.vstack([block1, block2, block3])  # shape (90, 3)
+    case_nums = np.arange(num_meshes)             # 0..89, matches params row count
+
+    variable_csv = np.column_stack((case_nums, params))
+    np.savetxt('HOPipeline/3D/mesh_parameters.csv', variable_csv, delimiter=',',
+            header='CaseNum,Radius,Height,Thickness', comments='', fmt="%.3f")
 
     #Generates the Meshes
-    for case_num, mesh_param in enumerate(mesh_params):
-        dir_name = os.path.join(cblresearch, f"MeshCases/case_{case_num}")
+    # for case_num in range(num_meshes):
+    #     dir_name = os.path.join(cblresearch, f"MeshCases/case_{case_num}")
+    #     if case_num < num_meshes // 3:
+    #         generate_mesh_gmsh(radiusRange[case_num], 8.5, 0.85, dir_name, case_num, apex_cap_frac=0.3)
+            
+    #     elif case_num < (2 * num_meshes) // 3:
+    #         generate_mesh_gmsh(2.5, heightRange[case_num - num_meshes // 3], 0.85, dir_name, case_num, apex_cap_frac=0.3)
+    #     else:
+    #         generate_mesh_gmsh(2.5, 8.5, thicknessRange[case_num - (2 * num_meshes) // 3], dir_name, case_num, apex_cap_frac=0.3)
+    #     print (f"Mesh {case_num} Generated and Fixed")
 
-        generate_mesh_gmsh(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num, apex_cap_frac=0.3)
-        print (f"Mesh {case_num} Generated and Fixed")
-
-    #Removes the unneeded .msh files
-    for file in range(0, num_meshes):
-        try:
-            dir_remove_name = os.path.join(cblresearch, f"MeshCases/case_{file}")
-            os.remove(os.path.join(dir_remove_name, f"mesh_{file}.msh"))
-            print(f"mesh_{file}.msh removed!")
-        except:
-            print(f"mesh_{file}.msh already removed!")
+    # #Removes the unneeded .msh files
+    # for file in range(0, num_meshes):
+    #     try:
+    #         dir_remove_name = os.path.join(cblresearch, f"MeshCases/case_{file}")
+    #         os.remove(os.path.join(dir_remove_name, f"mesh_{file}.msh"))
+    #         print(f"mesh_{file}.msh removed!")
+    #     except:
+    #         print(f"mesh_{file}.msh already removed!")

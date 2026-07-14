@@ -418,7 +418,7 @@ file_path = "HOPipeline/0D/0DOutputs.csv"
 write_header = not os.path.exists(file_path)
 
 with open(file_path, "w") as file:
-    file.write("gamma, n\n")
+    file.write("gamma,n\n")
 
 for file_num in range(0, filecount):
     CSV_PATH = f"{folderpath}/TPV_{file_num}.csv"

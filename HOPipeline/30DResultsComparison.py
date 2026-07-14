@@ -8,37 +8,64 @@ threed = pd.read_csv("HOPipeline/3D/mesh_parameters.csv", header = 0)
 zerod = pd.read_csv("HOPipeline/0D/0DOutputs.csv", header = 0)
 
 #Create new Columns for Gamma
-threed["gamma"] = threed["Thickness"]/threed["Radius"]
-threed_height = threed["Height"]
-threed_radius = threed["Radius"]
+threed_gamma = threed["Thickness"]/threed["Radius"]
+threed_HR = threed["Height"]/threed["Radius"]
 
-zerod_gamma = zerod["gamma"]
-zerod_n = zerod['n']
+
+threed["gamma"] = threed["Thickness"]/threed["Radius"]
+threed["HR"] = threed["Height"]/threed["Radius"]
 
 #Spearman Rank Correlation Dataframe Columns
 threed["gammaRank"] = threed["gamma"].rank()
 zerod["gammaRank"] = zerod["gamma"].rank()
-spearman_coef = threed["gammaRank"].corr(zerod["gammaRank"], method='spearman')
+threed["HRRank"] = threed["HR"].rank()
+zerod["nRank"] = zerod["n"].rank()
 
+#Separate into varied variables
+radiusPoints3 = threed.iloc[0:30]
+radiusPoints0 = zerod.iloc[0:30]
+heightPoints3 = threed.iloc[30:60]
+heightPoints0 = zerod.iloc[30:60]
+thicknessPoints3 = threed.iloc[60:90]
+thicknessPoints0 = zerod.iloc[60:90]
+
+print(thicknessPoints3)
+
+spearman_coef_gammaR = radiusPoints3["gamma"].corr(radiusPoints0["gamma"])
+spearman_coef_gammaH = heightPoints3["gamma"].corr(heightPoints0["gamma"])
+spearman_coef_gammaT = thicknessPoints3["gamma"].corr(thicknessPoints0["gamma"])
+spearman_coef_nR = radiusPoints3["HR"].corr(radiusPoints0["n"])
+spearman_coef_nH = heightPoints3["HR"].corr(heightPoints0["n"])
+spearman_coef_nT = thicknessPoints3["HR"].corr(thicknessPoints0["n"])
 
 #Graph Data
-fig, (ax1, ax2, ax3) = plt.subplots(1,3, figsize = (14,4))
+fig, axs = plt.subplots(2, 2, figsize = (14,6))
 
-ax1.scatter(threed["gamma"], zerod["gamma"])
-ax1.set_xlabel("3D Gamma")
-ax1.set_ylabel("0D Gamma")
+axs[0,0].scatter(radiusPoints3["gamma"], radiusPoints0['gamma'], label="Radius")
+axs[0,0].scatter(thicknessPoints3["gamma"], thicknessPoints0['gamma'], label="Thickness")
+axs[0,0].set_xlabel("3D Gamma")
+axs[0,0].set_ylabel("0D Gamma")
+axs[0,0].legend(loc = "upper left")
 
-ax2.scatter(threed["Height"]/threed["Radius"], zerod["n"])
-ax2.set_xlabel("3D Height/Radius")
-ax2.set_ylabel("0D n")
+axs[0,1].scatter(radiusPoints3["gammaRank"], radiusPoints0["gammaRank"], label="Radius")
+axs[0,1].scatter(thicknessPoints3["gammaRank"], thicknessPoints0["gammaRank"], label="Thickness")
+axs[0,1].set_xlabel("3D Gamma Rank")
+axs[0,1].set_ylabel("0D Gamma Rank")
+axs[0,1].set_title(f"Spearman Coefficients: Radius = {spearman_coef_gammaR:.2f}, Thickness = {spearman_coef_gammaT:.2f}")
+axs[0,1].legend(loc = "upper left")
 
-ax3.scatter(threed["gammaRank"], zerod["gammaRank"])
-m, b = np.polyfit(threed["gammaRank"], zerod["gammaRank"], 1)
-ax3.plot(threed["gammaRank"], m * zerod["gammaRank"] + b, color='red')
-ax3.set_title(f"Spearman Ranked Scatter Plot (rho = {spearman_coef:.2f})")
-ax3.set_xlabel("Rank of 3D Gamma")
-ax3.set_ylabel("Rank of 0D Gamma")
+axs[1,0].scatter(radiusPoints3["Height"]/radiusPoints3["Radius"], radiusPoints0['n'], label="Radius")
+axs[1,0].scatter(heightPoints3["Height"]/heightPoints3["Radius"], heightPoints0['n'], label="Height")
+axs[1,0].set_xlabel("3D Height/Radius")
+axs[1,0].set_ylabel("0D n")
+axs[1,0].legend(loc = "upper left")
 
+axs[1,1].scatter(radiusPoints3["HRRank"], radiusPoints0["nRank"], label="Radius")
+axs[1,1].scatter(heightPoints3["HRRank"], heightPoints0["nRank"], label="Height")
+axs[1,1].set_xlabel("3D Height/Radius Rank")
+axs[1,1].set_ylabel("0D n Rank")
+axs[1,1].set_title(f"Spearman Coefficients: Radius = {spearman_coef_nR:.2f}, Height = {spearman_coef_nH:.2f}")
+axs[1,1].legend(loc = "upper left")
 
-
+plt.savefig('/users/alanh/Documents/CBLResearch-github/HOPipeline/GammaNCorrelation.png', dpi=300)
 plt.show()
