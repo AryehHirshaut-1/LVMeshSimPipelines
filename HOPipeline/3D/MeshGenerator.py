@@ -17,6 +17,7 @@ import csv
 
 #To Vary One Parameter at a Time
 from scipy.stats import truncnorm
+import itertools
 
 #Dimensions are Radius, Height, and Thickness (in that order), each with minimum and maxiumum values. 
 #Usual Height - 5-12 cm, Usual Radius - 2.1-2.95 cm,
@@ -30,10 +31,10 @@ dimensions = {
     "Thickness_Higher": 1.1,
 }
 
-num_meshes = 90
+num_meshes = 810
 
 #General Path to Generated Mesh Directory
-cblresearch = os.path.join(os.path.expanduser("~"), "Documents/CBLResearch-github/HOPipeline/3D")
+cblresearch = os.path.join(os.path.expanduser("~"), "HOPipeline/3D")
 
 #USING GMSH
 #Creates Geometry and Generates Mesh
@@ -244,67 +245,84 @@ def lhsampler(radrangelow, radrangehigh, heightrangelow, heightrangehigh, thickn
             writer.writerow([i] + row.tolist())
     return lv_models
 
-if __name__ == "__main__":
-        
-    #Perform the Latin Hypercube Sampling
-    #mesh_params_thick = lhsampler(dimensions["Radius_Lower"], dimensions["Radius_Higher"], dimensions["Height_Lower"], dimensions["Height_Higher"], dimensions["Thickness_Lower"], dimensions["Thickness_Higher"])  # Example parameter ranges
+def build_param_sweep(num_meshes, dimensions):
+    # num_meshes should be divisible by 27 (3 params x 9 combos each)
+    n_third = num_meshes // 27  # points per sweep block
 
-    n_third = num_meshes // 3  # 30
-
-    # constants to hold each param at while others vary — pick sensible fixed values
-    radius_default = 2.5     # or hardcode e.g. 2.5
-    height_default = 8.5     # or hardcode e.g. 8.5
-    thickness_default = 0.85 # or hardcode e.g. 0.85
-
-    radiusRange = np.linspace(dimensions["Radius_Lower"], dimensions["Radius_Higher"], n_third)
-    heightRange = np.linspace(dimensions["Height_Lower"], dimensions["Height_Higher"], n_third)
+    radiusRange    = np.linspace(dimensions["Radius_Lower"],    dimensions["Radius_Higher"],    n_third)
+    heightRange    = np.linspace(dimensions["Height_Lower"],    dimensions["Height_Higher"],    n_third)
     thicknessRange = np.linspace(dimensions["Thickness_Lower"], dimensions["Thickness_Higher"], n_third)
 
-    # Block 1: vary radius, height & thickness constant
-    block1 = np.column_stack([
-        radiusRange,
-        np.full(n_third, height_default),
-        np.full(n_third, thickness_default)
-    ])
+    # 3 "held fixed" levels per parameter -> 3x3 = 9 combos per varied param
+    radius_fixed    = np.array([2.1, 2.5, 2.95])
+    height_fixed    = np.array([5.0, 8.5, 12])
+    thickness_fixed = np.array([0.6, 0.85, 1.1])
 
-    # Block 2: vary height, radius & thickness constant
-    block2 = np.column_stack([
-        np.full(n_third, radius_default),
-        heightRange,
-        np.full(n_third, thickness_default)
-    ])
+    def block(vary_range, r, h, t):
+        """r, h, t: scalars or arrays (length n_third). Whichever is `vary_range`
+        replaces the corresponding fixed value."""
+        return np.column_stack([
+            vary_range if r is None else np.full(n_third, r),
+            vary_range if h is None else np.full(n_third, h),
+            vary_range if t is None else np.full(n_third, t),
+        ])
 
-    # Block 3: vary thickness, radius & height constant
-    block3 = np.column_stack([
-        np.full(n_third, radius_default),
-        np.full(n_third, height_default),
-        thicknessRange
-    ])
+    blocks = []
 
-    params = np.vstack([block1, block2, block3])  # shape (90, 3)
-    case_nums = np.arange(num_meshes)             # 0..89, matches params row count
+    # Radius varied: sweep radius, hold height & thickness at each of 9 combos
+    for h, t in itertools.product(height_fixed, thickness_fixed):
+        blocks.append(block(radiusRange, None, h, t))
+
+    # Height varied: sweep height, hold radius & thickness
+    for r, t in itertools.product(radius_fixed, thickness_fixed):
+        blocks.append(block(heightRange, r, None, t))
+
+    # Thickness varied: sweep thickness, hold radius & height
+    for r, h in itertools.product(radius_fixed, height_fixed):
+        blocks.append(block(thicknessRange, r, h, None))
+
+    params = np.vstack(blocks)          # shape (27 * n_third, 3)
+    case_nums = np.arange(params.shape[0])
+    
 
     variable_csv = np.column_stack((case_nums, params))
     np.savetxt('HOPipeline/3D/mesh_parameters.csv', variable_csv, delimiter=',',
             header='CaseNum,Radius,Height,Thickness', comments='', fmt="%.3f")
 
-    #Generates the Meshes
-    # for case_num in range(num_meshes):
-    #     dir_name = os.path.join(cblresearch, f"MeshCases/case_{case_num}")
-    #     if case_num < num_meshes // 3:
-    #         generate_mesh_gmsh(radiusRange[case_num], 8.5, 0.85, dir_name, case_num, apex_cap_frac=0.3)
-            
-    #     elif case_num < (2 * num_meshes) // 3:
-    #         generate_mesh_gmsh(2.5, heightRange[case_num - num_meshes // 3], 0.85, dir_name, case_num, apex_cap_frac=0.3)
-    #     else:
-    #         generate_mesh_gmsh(2.5, 8.5, thicknessRange[case_num - (2 * num_meshes) // 3], dir_name, case_num, apex_cap_frac=0.3)
-    #     print (f"Mesh {case_num} Generated and Fixed")
+    return params, case_nums
 
-    # #Removes the unneeded .msh files
-    # for file in range(0, num_meshes):
-    #     try:
-    #         dir_remove_name = os.path.join(cblresearch, f"MeshCases/case_{file}")
-    #         os.remove(os.path.join(dir_remove_name, f"mesh_{file}.msh"))
-    #         print(f"mesh_{file}.msh removed!")
-    #     except:
-    #         print(f"mesh_{file}.msh already removed!")
+def generate_all_meshes(params, case_nums, output_root, generate_mesh_gmsh,
+                         layers_through_wall=3, apex_cap_frac=0.3):
+    """
+    params: (N, 3) array of [radius, height, thickness]
+    case_nums: (N,) array of case indices
+    """
+    log_rows = []
+
+    for case_num, (radius, height, thickness) in zip(case_nums, params):
+        run_id = f"{case_num}"
+        case_dir = os.path.join(output_root, run_id)
+        os.makedirs(case_dir, exist_ok=True)
+
+        generate_mesh_gmsh(
+            ab_in=radius,
+            c_in=height,
+            thickness=thickness,
+            output_dir=case_dir,
+            run_id=run_id,
+            layers_through_wall=layers_through_wall,
+            apex_cap_frac=apex_cap_frac,
+        )
+
+if __name__ == "__main__":
+
+    # params, case_nums = build_param_sweep(num_meshes, dimensions)
+    # generate_all_meshes(params, case_nums, "HOPipeline/3D/MeshCases", generate_mesh_gmsh)
+    #Removes the unneeded .msh files
+    for file in range(0, num_meshes):
+        try:
+            dir_remove_name = os.path.join(cblresearch, f"MeshCases/case_{file}")
+            os.remove(f"HOPipeline/3D/MeshCases/case_{file}/mesh_{file}.msh")
+            print(f"mesh_{file}.msh removed!")
+        except:
+            print(f"mesh_{file}.msh already removed!")

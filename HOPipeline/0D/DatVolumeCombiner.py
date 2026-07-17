@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-folderpath = Path("/users/alanh/Documents/CBLResearch-github/HOPipeline/3D/VolumeCSVs")
+folderpath = Path("/users/alanh/Documents/CBLResearch-github/HOPipeline/3D/VolumeResults810")
 filecount = sum(1 for file in folderpath.iterdir() if file.is_file())
 
 
@@ -42,7 +42,7 @@ for file_num in range(0, filecount):
     DAT_PRESSURE_COL = 1
 
     # --- .csv file (volume) from your volume extractor ---
-    CSV_PATH = f"{GeneralFile}/3D/VolumeCSVs/lv_volumes_{file_num}.csv"
+    CSV_PATH = f"{GeneralFile}/3D/VolumeResults810/lv_volumes_{file_num}.csv"
 
     # If the CSV has a header row with column names, set this to the exact
     # column name. If there's no header, set to None and use CSV_VOLUME_COL_INDEX.

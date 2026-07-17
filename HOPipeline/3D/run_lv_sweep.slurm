@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=lv_sensitivity_analysis
-#SBATCH --array=0-89
+#SBATCH --array=0-809
 #SBATCH --nodes=1
 #SBATCH --ntasks=16
 #SBATCH --cpus-per-task=1
-#SBATCH --time=01:00:00
+#SBATCH --time=01:30:00
 #SBATCH --output=logs/case_%a.out
 #SBATCH --error=logs/case_%a.err
 
@@ -33,9 +33,14 @@ mpirun -np 3 svmultiphysics "$XML"
 
 echo "[case ${i}] done  $(date) -> results/case_${i}/"
 
+source 14/bin/activate
+
 # Volume extraction for this case only
 python3 "$WORKDIR/VolumeFinder.py" \
     --case "$i" \
     --general-path "$WORKDIR" \
     --mesh-path "MeshCases" \
-    --results-path "MultiPhysicsResults"
+
+
+
+
