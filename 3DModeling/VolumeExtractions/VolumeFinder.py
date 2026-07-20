@@ -109,8 +109,6 @@ def volume_divergence_theorem(surface: pv.PolyData) -> float:
     signed_vols = np.einsum('ij,ij->i', v0, cross)
  
     return signed_vols.sum() / 6.0
-
-def volume_extract_divergence(file_num, material_type):
     # Load reference meshes to find endo node indices
     ref_volume = pv.read(f'/users/alanh/Documents/CBLResearch-github/MeshGeneration/lv_sim_cases/case_{file_num}/mesh_{file_num}_volume.vtu')
     endo_ref = pv.read(f'/users/alanh/Documents/CBLResearch-github/MeshGeneration/lv_sim_cases/case_{file_num}/mesh_{file_num}_endo.vtp')

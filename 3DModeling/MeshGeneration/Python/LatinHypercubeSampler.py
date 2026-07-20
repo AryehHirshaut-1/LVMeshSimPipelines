@@ -11,13 +11,10 @@ ranges = {
 
 num_samples = 100
 num_vars = len(ranges)
+var_names = list(ranges.keys())
 
-dist_params = {}
-for var, (vmin, vmax) in ranges.items():
-    mu = (vmin + vmax) / 2.0
-    sigma = (vmax - vmin) / (2 * 1.96)
-    dist_params[var] = (mu, sigma)
-
+l_bounds = [ranges[v][0] for v in var_names]
+u_bounds = [ranges[v][1] for v in var_names]
 
 sampler = qmc.LatinHypercube(d=num_vars)
 lhs_samples = sampler.random(n=num_samples) 
@@ -25,15 +22,7 @@ lhs_samples = sampler.random(n=num_samples)
 lv_models = np.zeros((num_samples, num_vars))
 var_names = list(ranges.keys())
 
-for i, var in enumerate(var_names):
-    mu, sigma = dist_params[var]
-    # Transform using the percent point function (inverse CDF)
-    raw_samples = norm.ppf(lhs_samples[:, i], loc=mu, scale=sigma)
-    
-    #Cap the values exactly at the defined range bounds
-    vmin, vmax = ranges[var]
-    lv_models[:, i] = np.clip(raw_samples, a_min=vmin, a_max=vmax)
-
+lv_models = qmc.scale(lhs_samples, l_bounds, u_bounds)
 lv_models = np.round(lv_models, decimals=3)
 
 print(f"Successfully generated {num_samples} Left Ventricle configurations.\n")

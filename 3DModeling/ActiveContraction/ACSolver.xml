@@ -58,16 +58,17 @@
    <Elasticity_modulus> 1.0 </Elasticity_modulus>   <!-- dyne/cm^2 -->
    <Poisson_ratio> 0.483333 </Poisson_ratio>
     
-    <Constitutive_model type="HolzapfelOgden">  <!-- MEAN OPTIMISED PARAMETERS FROM  -->
+   <Constitutive_model type="HolzapfelOgden">  <!-- MEAN OPTIMISED PARAMETERS FROM  -->
      <a> 14720.0 </a>                                   <!-- dyne/cm^2 -->
      <b> 33.39 </b>                                   <!-- no units -->
-     <a4f> 3.008 </a4f>
+     <a4f> 30080.0 </a4f>
      <b4f> 88.39 </b4f>
-     <a4s> 0.942 </a4s>
+     <a4s> 9420.0 </a4s>
      <b4s> 14.30 </b4s>
-     <afs> 2.581 </afs>
+     <afs> 25810.0 </afs>
      <bfs> 34.91 </bfs>
      <k> 100.0 </k>
+   </Constitutive_model>
    </Constitutive_model>
 
    <Dilational_penalty_model> ST91 </Dilational_penalty_model>

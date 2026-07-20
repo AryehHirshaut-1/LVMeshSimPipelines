@@ -83,7 +83,7 @@ HO_PARAMS = {
     "b4f": 88.39,
     "a4s": 9420.0,
     "b4s": 14.30,
-    "eta": 0,
+    "eta": 0.0,
 }
 
 # Initial guesses for geometry parameters
@@ -146,7 +146,6 @@ def compute_tau(time):
         tau_prev = tau
 
     return tau_vec
-
 
 def load_time_pressure_volume_from_csv(csv_path):
     """
@@ -410,182 +409,181 @@ def residual_theta_logged(theta):
 # LOAD DATA - START OF LOOP
 # ============================================================
 
-folderpath = Path("/users/alanh/Documents/CBLResearch-github/HOPipeline/0D/InputFiles")
-filecount = sum(1 for file in folderpath.iterdir() if file.is_file())
+folderpath = Path("/users/alanh/Documents/CBLResearch-github/HOPipelineSingle/0D/CSV")
 
 #Create Output CSV File
-file_path = "HOPipeline/0D/0DOutputs.csv"
+file_path = "HOPipelineSingle/0D/CSV/0DOutput.csv"
 write_header = not os.path.exists(file_path)
 
 with open(file_path, "w") as file:
     file.write("gamma,n\n")
 
-for file_num in range(0, filecount):
-    CSV_PATH = f"{folderpath}/TPV_{file_num}.csv"
 
-    time, Pout, volume = load_time_pressure_volume_from_csv(CSV_PATH)
+CSV_PATH = f"{folderpath}/TPV_0.csv"
 
-    # No separate dV/dt source in the CSV format, so always differentiate numerically.
-    dvolume = np.gradient(volume, time)
+time, Pout, volume = load_time_pressure_volume_from_csv(CSV_PATH)
 
-    print("Loaded:")
-    print(f"  MATERIAL_MODEL = {MATERIAL_MODEL}")
-    print(f"  CSV_PATH       = {CSV_PATH}")
-    print(f"  N points       = {len(time)}")
-    print(f"  time range     = [{time[0]:.6f}, {time[-1]:.6f}]")
-    print(f"  Pout range     = [{Pout.min():.6e}, {Pout.max():.6e}]")
-    print(f"  volume range   = [{volume.min():.6e}, {volume.max():.6e}]")
-    print(f"  dV/dt range    = [{dvolume.min():.6e}, {dvolume.max():.6e}]")
-    print()
+# No separate dV/dt source in the CSV format, so always differentiate numerically.
+dvolume = np.gradient(volume, time)
 
-    # ============================================================
-    # PRECOMPUTE KINEMATICS INPUTS
-    # ============================================================
+print("Loaded:")
+print(f"  MATERIAL_MODEL = {MATERIAL_MODEL}")
+print(f"  CSV_PATH       = {CSV_PATH}")
+print(f"  N points       = {len(time)}")
+print(f"  time range     = [{time[0]:.6f}, {time[-1]:.6f}]")
+print(f"  Pout range     = [{Pout.min():.6e}, {Pout.max():.6e}]")
+print(f"  volume range   = [{volume.min():.6e}, {volume.max():.6e}]")
+print(f"  dV/dt range    = [{dvolume.min():.6e}, {dvolume.max():.6e}]")
+print()
 
-    tau_vec = compute_tau(time)
+# ============================================================
+# PRECOMPUTE KINEMATICS INPUTS
+# ============================================================
 
-    V_safe = np.maximum(volume, 1e-12)
-    V0 = V_safe[0]
-    Vratio = V_safe / V0
+tau_vec = compute_tau(time)
 
-    # Initial guess in reparameterized variables:
-    # theta[0] = log(gamma)
-    # theta[1] = log(n)
-    g0 = np.log(INITIAL_GAMMA_GUESS)
-    n0 = np.log(INITIAL_N_GUESS)
+V_safe = np.maximum(volume, 1e-12)
+V0 = V_safe[0]
+Vratio = V_safe / V0
 
-    norm_factor = 1.0
+# Initial guess in reparameterized variables:
+# theta[0] = log(gamma)
+# theta[1] = log(n)
+g0 = np.log(INITIAL_GAMMA_GUESS)
+n0 = np.log(INITIAL_N_GUESS)
 
-    if NORMALIZE_COST:
-        norm_factor = 1.0 / (np.sqrt(len(time)) * Pout.max())
-        print(f"Cost normalization: 1/(sqrt(N)*max(Pout)) = {norm_factor:.4e}")
-        print(f"  Normalized cost ≈ RMS residual / max(Pout)  (dimensionless)\n")
+norm_factor = 1.0
 
-    # Material parameter selection
-    if MATERIAL_MODEL == "NH":
-        material_params = dict(NH_PARAMS)
-    elif MATERIAL_MODEL == "HO":
-        material_params = dict(HO_PARAMS)
-    else:
-        raise ValueError("MATERIAL_MODEL must be 'NH' or 'HO'.")
+if NORMALIZE_COST:
+    norm_factor = 1.0 / (np.sqrt(len(time)) * Pout.max())
+    print(f"Cost normalization: 1/(sqrt(N)*max(Pout)) = {norm_factor:.4e}")
+    print(f"  Normalized cost ≈ RMS residual / max(Pout)  (dimensionless)\n")
 
-    # ============================================================
-    # FIT MASK
-    # ============================================================
+# Material parameter selection
+if MATERIAL_MODEL == "NH":
+    material_params = dict(NH_PARAMS)
+elif MATERIAL_MODEL == "HO":
+    material_params = dict(HO_PARAMS)
+else:
+    raise ValueError("MATERIAL_MODEL must be 'NH' or 'HO'.")
 
-    if FIT_BRANCH == "all":
-        fit_mask = np.ones_like(time, dtype=bool)
-    elif FIT_BRANCH == "inflation":
-        #fit_mask = dvolume > 0.0
-        imax = np.argmax(Pout)
-        fit_mask = np.arange(len(Pout)) <= imax
-    elif FIT_BRANCH == "deflation":
-        fit_mask = dvolume < 0.0
-    else:
-        raise ValueError("FIT_BRANCH must be 'all', 'inflation', or 'deflation'.")
+# ============================================================
+# FIT MASK
+# ============================================================
 
-    if np.count_nonzero(fit_mask) < 3:
-        raise ValueError(f"FIT_BRANCH='{FIT_BRANCH}' leaves too few points to fit.")
+if FIT_BRANCH == "all":
+    fit_mask = np.ones_like(time, dtype=bool)
+elif FIT_BRANCH == "inflation":
+    #fit_mask = dvolume > 0.0
+    imax = np.argmax(Pout)
+    fit_mask = np.arange(len(Pout)) <= imax
+elif FIT_BRANCH == "deflation":
+    fit_mask = dvolume < 0.0
+else:
+    raise ValueError("FIT_BRANCH must be 'all', 'inflation', or 'deflation'.")
 
-    print(f"  FIT_BRANCH     = {FIT_BRANCH} ({np.count_nonzero(fit_mask)}/{len(fit_mask)} points)")
-    print()
+if np.count_nonzero(fit_mask) < 3:
+    raise ValueError(f"FIT_BRANCH='{FIT_BRANCH}' leaves too few points to fit.")
 
-
-
-    # ============================================================
-    # OPTIMIZATION
-    # ============================================================
-
-    theta_init_list = [g0, n0]
-    for key in get_optimized_material_keys(MATERIAL_MODEL):
-        guess_val = get_material_init_guess(MATERIAL_MODEL)[key]
-        if guess_val <= 0.0:
-            raise ValueError(f"Initial guess for '{key}' must be > 0 when optimizing in log-space.")
-        theta_init_list.append(np.log(guess_val))
-
-    theta_init = np.array(theta_init_list, dtype=float)
-
-    trajectory = []
-    cost_traj = []
-    _last_theta = None
-
-    if PLOT_RESIDUAL_TERMS:
-        plot_residual_terms(theta_init, title="Initial guess term contributions")
+print(f"  FIT_BRANCH     = {FIT_BRANCH} ({np.count_nonzero(fit_mask)}/{len(fit_mask)} points)")
+print()
 
 
-    sol = least_squares(
-        residual_theta_logged,
-        theta_init,
-        method="lm",
-        jac="2-point",
-        max_nfev=2000,
-    )
 
-    log_gamma_hat, log_n_hat = sol.x[:2]
-    gamma_hat = float(np.exp(log_gamma_hat))
-    n_hat = float(np.exp(log_n_hat))
+# ============================================================
+# OPTIMIZATION
+# ============================================================
 
-    opt_material_params = update_material_params_from_theta(
-        material_params, sol.x, MATERIAL_MODEL
-    )
+theta_init_list = [g0, n0]
+for key in get_optimized_material_keys(MATERIAL_MODEL):
+    guess_val = get_material_init_guess(MATERIAL_MODEL)[key]
+    if guess_val <= 0.0:
+        raise ValueError(f"Initial guess for '{key}' must be > 0 when optimizing in log-space.")
+    theta_init_list.append(np.log(guess_val))
+
+theta_init = np.array(theta_init_list, dtype=float)
+
+trajectory = []
+cost_traj = []
+_last_theta = None
+
+if PLOT_RESIDUAL_TERMS:
+    plot_residual_terms(theta_init, title="Initial guess term contributions")
+
+
+sol = least_squares(
+    residual_theta_logged,
+    theta_init,
+    method="lm",
+    jac="2-point",
+    max_nfev=2000,
+)
+
+log_gamma_hat, log_n_hat = sol.x[:2]
+gamma_hat = float(np.exp(log_gamma_hat))
+n_hat = float(np.exp(log_n_hat))
+
+opt_material_params = update_material_params_from_theta(
+    material_params, sol.x, MATERIAL_MODEL
+)
 
 #Print optimization results - MOST IMPORTANT PART
-    combined = np.column_stack([gamma_hat, n_hat])
+combined = np.column_stack([gamma_hat, n_hat])
 
-    with open("HOPipeline/0D/0DOutputs.csv", "a") as file:
-    # This automatically writes row_a on line one and row_b on line two
-        np.savetxt(file, combined, fmt="%.6f",
-            comments="", delimiter=','
-        )
+with open(file_path, "a") as file:
+# This automatically writes row_a on line one and row_b on line two
+    np.savetxt(file, combined, fmt="%.6f",
+        comments="", delimiter=','
+    )
 
-    if PLOT_RESIDUAL_TERMS:
-        plot_residual_terms(sol.x, title="Optimized term contributions")
+if PLOT_RESIDUAL_TERMS:
+    plot_residual_terms(sol.x, title="Optimized term contributions")
 
-    print("=== Optimization result ===")
-    print(f"MATERIAL_MODEL = {MATERIAL_MODEL}")
-    print(f"OPTIMIZE_MATERIAL_PARAMS = {OPTIMIZE_MATERIAL_PARAMS}")
-    print(f"OPTIMIZE_ETA = {OPTIMIZE_ETA}")
-    print(f"theta* = {theta_to_named_dict(sol.x, MATERIAL_MODEL)}")
-    print(f"gamma* = {gamma_hat:.9f}")
-    print(f"n*     = {n_hat:.9f}")
+print("=== Optimization result ===")
+print(f"MATERIAL_MODEL = {MATERIAL_MODEL}")
+print(f"OPTIMIZE_MATERIAL_PARAMS = {OPTIMIZE_MATERIAL_PARAMS}")
+print(f"OPTIMIZE_ETA = {OPTIMIZE_ETA}")
+print(f"theta* = {theta_to_named_dict(sol.x, MATERIAL_MODEL)}")
+print(f"gamma* = {gamma_hat:.9f}")
+print(f"n*     = {n_hat:.9f}")
 
-    if OPTIMIZE_MATERIAL_PARAMS:
-        print("optimized material parameters:")
-        if MATERIAL_MODEL == "NH":
-            print(f"  W1*  = {opt_material_params['W1']:.9e}")
-            print(f"  W2*  = {opt_material_params['W2']:.9e}  (fixed)")
-            print(f"  eta* = {opt_material_params['eta']:.9e}")
-            print(f"  gamma*W1*  = {gamma_hat * opt_material_params['W1']:.9e}")
-            print(f"  gamma*eta* = {gamma_hat * opt_material_params['eta']:.9e}")
-        elif MATERIAL_MODEL == "HO":
-            for key in ["a", "b", "a4f", "b4f", "a4s", "b4s", "eta"]:
-                suffix = "" if key in get_optimized_material_keys(MATERIAL_MODEL) else "  (fixed)"
-                print(f"  {key:>3s}* = {opt_material_params[key]:.9e}{suffix}")
-            print(f"  gamma*a*   = {gamma_hat * opt_material_params['a']:.9e}")
-            print(f"  gamma*eta* = {gamma_hat * opt_material_params['eta']:.9e}")
+if OPTIMIZE_MATERIAL_PARAMS:
+    print("optimized material parameters:")
+    if MATERIAL_MODEL == "NH":
+        print(f"  W1*  = {opt_material_params['W1']:.9e}")
+        print(f"  W2*  = {opt_material_params['W2']:.9e}  (fixed)")
+        print(f"  eta* = {opt_material_params['eta']:.9e}")
+        print(f"  gamma*W1*  = {gamma_hat * opt_material_params['W1']:.9e}")
+        print(f"  gamma*eta* = {gamma_hat * opt_material_params['eta']:.9e}")
+    elif MATERIAL_MODEL == "HO":
+        for key in ["a", "b", "a4f", "b4f", "a4s", "b4s", "eta"]:
+            suffix = "" if key in get_optimized_material_keys(MATERIAL_MODEL) else "  (fixed)"
+            print(f"  {key:>3s}* = {opt_material_params[key]:.9e}{suffix}")
+        print(f"  gamma*a*   = {gamma_hat * opt_material_params['a']:.9e}")
+        print(f"  gamma*eta* = {gamma_hat * opt_material_params['eta']:.9e}")
 
-    print(f"final cost = {sol.cost:.6e}  (0.5*||r||^2)")
-    print(f"||r||_2     = {np.linalg.norm(sol.fun):.6e}")
-    print(f"nfev        = {sol.nfev}")
-    print(f"status      = {sol.status}  ({sol.message})")
-    print()
+print(f"final cost = {sol.cost:.6e}  (0.5*||r||^2)")
+print(f"||r||_2     = {np.linalg.norm(sol.fun):.6e}")
+print(f"nfev        = {sol.nfev}")
+print(f"status      = {sol.status}  ({sol.message})")
+print()
 
-    # Ensure trajectory has start/end
-    if len(trajectory) == 0:
-        trajectory = [theta_init.copy(), sol.x.copy()]
-        cost_traj = [
-            float(np.linalg.norm(residual_theta(theta_init))),
-            float(np.linalg.norm(sol.fun)),
-        ]
-    else:
-        if np.linalg.norm(trajectory[0] - theta_init) > 0:
-            trajectory.insert(0, theta_init.copy())
-            cost_traj.insert(0, float(np.linalg.norm(residual_theta(theta_init))))
-        if np.linalg.norm(trajectory[-1] - sol.x) > 0:
-            trajectory.append(sol.x.copy())
-            cost_traj.append(float(np.linalg.norm(sol.fun)))
+# Ensure trajectory has start/end
+if len(trajectory) == 0:
+    trajectory = [theta_init.copy(), sol.x.copy()]
+    cost_traj = [
+        float(np.linalg.norm(residual_theta(theta_init))),
+        float(np.linalg.norm(sol.fun)),
+    ]
+else:
+    if np.linalg.norm(trajectory[0] - theta_init) > 0:
+        trajectory.insert(0, theta_init.copy())
+        cost_traj.insert(0, float(np.linalg.norm(residual_theta(theta_init))))
+    if np.linalg.norm(trajectory[-1] - sol.x) > 0:
+        trajectory.append(sol.x.copy())
+        cost_traj.append(float(np.linalg.norm(sol.fun)))
 
-    traj = np.vstack(trajectory)
+traj = np.vstack(trajectory)
 
 # ============================================================
 # OPTIONAL LANDSCAPE PLOT

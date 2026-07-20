@@ -4,8 +4,8 @@ import seaborn as sns
 import numpy as np
 
 #CSV File Paths
-threed = pd.read_csv("HOPipeline/3D/mesh_parameters.csv", header = 0)
-zerod = pd.read_csv("HOPipeline/0D/0DOutputs.csv", header = 0)
+threed = pd.read_csv("HOPipelineSingle/3D/mesh_parameters.csv", header = 0)
+zerod = pd.read_csv("HOPipelineSingle/0D/0DOutputs.csv", header = 0)
 
 #Create new Columns for Gamma
 threed_gamma = threed["Thickness"]/threed["Radius"]

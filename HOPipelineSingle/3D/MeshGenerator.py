@@ -31,19 +31,13 @@ dimensions = {
     "Thickness_Higher": 1.1,
 }
 
-pig_dimensions = {
-    "Radius_Lower": 2.1,
-    "Radius_Higher": 2.95,
-    "Height_Lower": 5,
-    "Height_Higher": 12,
-    "Thickness_Lower": 0.6,
-    "Thickness_Higher": 1.1,
-}
-
 num_meshes = 1
+radius = 2.5
+height = 8.5
+thickness = 0.85
 
 #General Path to Generated Mesh Directory
-cblresearch = os.path.join(os.path.expanduser("~"), "HOPipeline/3D")
+cblresearch = os.path.join(os.path.expanduser("~"), "HOPipelineSingle/3D")
 
 #USING GMSH
 #Creates Geometry and Generates Mesh
@@ -213,124 +207,14 @@ def generate_mesh_gmsh(ab_in, c_in, thickness, output_dir, run_id, layers_throug
             surf.save(os.path.join(output_dir, f"mesh_{run_id}_{sub_name}.vtp"))
             print(f"Case {run_id} — {sub_name}: {surf.n_points} nodes, {surf.n_cells} faces")
 
-def lhsampler(radrangelow, radrangehigh, heightrangelow, heightrangehigh, thicknessrangelow, thicknessrangehigh):
-    ranges = {
-        'radius': (radrangelow, radrangehigh),     # Inner radius
-        'height': (heightrangelow, heightrangehigh),     # Distance from apex to base
-        'thickness': (thicknessrangelow, thicknessrangehigh)    # Myocardial wall thickness
-    }
-
-    num_samples = num_meshes
-    num_vars = len(ranges)
-
-    dist_params = {}
-    for var, (vmin, vmax) in ranges.items():
-        mu = (vmin + vmax) / 2.0
-        sigma = (vmax - vmin) / (2 * 1.96)
-        dist_params[var] = (mu, sigma)
-
-
-    sampler = qmc.LatinHypercube(d=num_vars)
-    lhs_samples = sampler.random(n=num_samples) 
-
-
-    lv_models = np.zeros((num_samples, num_vars))
-    var_names = list(ranges.keys())
-
-    for i, var in enumerate(var_names):
-        mu, sigma = dist_params[var]
-        # Transform using the percent point function (inverse CDF)
-        raw_samples = norm.ppf(lhs_samples[:, i], loc=mu, scale=sigma)
-    
-        # ADDITION: Cap the values exactly at the defined range bounds
-        vmin, vmax = ranges[var]
-        lv_models[:, i] = np.clip(raw_samples, a_min=vmin, a_max=vmax)
-
-    lv_models = np.round(lv_models, decimals=3)
-    with open(os.path.join(cblresearch, "mesh_parameters.csv"), mode='w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['CaseNum','Radius', 'Height', 'Thickness'])
-        for i, row in enumerate(lv_models):
-            writer.writerow([i] + row.tolist())
-    return lv_models
-
-def build_param_sweep(num_meshes, dimensions):
-    # num_meshes should be divisible by 27 (3 params x 9 combos each)
-    n_third = num_meshes // 27  # points per sweep block
-
-    radiusRange    = np.linspace(dimensions["Radius_Lower"],    dimensions["Radius_Higher"],    n_third)
-    heightRange    = np.linspace(dimensions["Height_Lower"],    dimensions["Height_Higher"],    n_third)
-    thicknessRange = np.linspace(dimensions["Thickness_Lower"], dimensions["Thickness_Higher"], n_third)
-
-    # 3 "held fixed" levels per parameter -> 3x3 = 9 combos per varied param
-    radius_fixed    = np.array([2.1, 2.5, 2.95])
-    height_fixed    = np.array([5.0, 8.5, 12])
-    thickness_fixed = np.array([0.6, 0.85, 1.1])
-
-    def block(vary_range, r, h, t):
-        """r, h, t: scalars or arrays (length n_third). Whichever is `vary_range`
-        replaces the corresponding fixed value."""
-        return np.column_stack([
-            vary_range if r is None else np.full(n_third, r),
-            vary_range if h is None else np.full(n_third, h),
-            vary_range if t is None else np.full(n_third, t),
-        ])
-
-    blocks = []
-
-    # Radius varied: sweep radius, hold height & thickness at each of 9 combos
-    for h, t in itertools.product(height_fixed, thickness_fixed):
-        blocks.append(block(radiusRange, None, h, t))
-
-    # Height varied: sweep height, hold radius & thickness
-    for r, t in itertools.product(radius_fixed, thickness_fixed):
-        blocks.append(block(heightRange, r, None, t))
-
-    # Thickness varied: sweep thickness, hold radius & height
-    for r, h in itertools.product(radius_fixed, height_fixed):
-        blocks.append(block(thicknessRange, r, h, None))
-
-    params = np.vstack(blocks)          # shape (27 * n_third, 3)
-    case_nums = np.arange(params.shape[0])
-    
-
-    variable_csv = np.column_stack((case_nums, params))
-    np.savetxt('HOPipeline/3D/mesh_parameters.csv', variable_csv, delimiter=',',
-            header='CaseNum,Radius,Height,Thickness', comments='', fmt="%.3f")
-
-    return params, case_nums
-
-def generate_all_meshes(params, case_nums, output_root, generate_mesh_gmsh,
-                         layers_through_wall=3, apex_cap_frac=0.3):
-    """
-    params: (N, 3) array of [radius, height, thickness]
-    case_nums: (N,) array of case indices
-    """
-    log_rows = []
-
-    for case_num, (radius, height, thickness) in zip(case_nums, params):
-        run_id = f"{case_num}"
-        case_dir = os.path.join(output_root, run_id)
-        os.makedirs(case_dir, exist_ok=True)
-
-        generate_mesh_gmsh(
-            ab_in=radius,
-            c_in=height,
-            thickness=thickness,
-            output_dir=case_dir,
-            run_id=run_id,
-            layers_through_wall=layers_through_wall,
-            apex_cap_frac=apex_cap_frac,
-        )
 
 if __name__ == "__main__":
     # params, case_nums = build_param_sweep(num_meshes, dimensions)
-    # generate_all_meshes(params, case_nums, "HOPipeline/3D/MeshCases", generate_mesh_gmsh)
+    generate_mesh_gmsh(radius, height, thickness, "HOPipelineSingle/3D")
     #Removes the unneeded .msh files
-    for file in range(0, num_meshes):
-        try:
-            dir_remove_name = os.path.join(cblresearch, f"MeshCases/case_{file}")
-            os.remove(f"HOPipeline/3D/case_{file}/mesh_{file}.msh")
-            print(f"mesh_{file}.msh removed!")
-        except:
-            print(f"mesh_{file}.msh already removed!")
+    try:
+        dir_remove_name = os.path.join(cblresearch, f"case_0")
+        os.remove(f"HOPipelineSingle/3D/case_0/mesh_0.msh")
+        print(f"mesh_0.msh removed!")
+    except:
+        print(f"mesh_0.msh already removed!")
