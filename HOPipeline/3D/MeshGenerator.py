@@ -31,19 +31,20 @@ dimensions = {
     "Thickness_Higher": 1.1,
 }
 
+#Dimensions from Meissner et al (2024)
 pig_dimensions = {
-    "Radius_Lower": 2.1,
-    "Radius_Higher": 2.95,
-    "Height_Lower": 5,
-    "Height_Higher": 12,
-    "Thickness_Lower": 0.6,
-    "Thickness_Higher": 1.1,
+    "Radius_Lower": 2.3,
+    "Radius_Higher": 2.98,
+    "Height_Lower": 7.0,
+    "Height_Higher": 9.2,
+    "Thickness_Lower": 0.4,
+    "Thickness_Higher": 0.6,
 }
 
-num_meshes = 1
+num_meshes = 100
 
 #General Path to Generated Mesh Directory
-cblresearch = os.path.join(os.path.expanduser("~"), "HOPipeline/3D")
+cblresearch = "HOPipeline/3D"
 
 #USING GMSH
 #Creates Geometry and Generates Mesh
@@ -222,32 +223,21 @@ def lhsampler(radrangelow, radrangehigh, heightrangelow, heightrangehigh, thickn
 
     num_samples = num_meshes
     num_vars = len(ranges)
+    var_names = list(ranges.keys())
 
-    dist_params = {}
-    for var, (vmin, vmax) in ranges.items():
-        mu = (vmin + vmax) / 2.0
-        sigma = (vmax - vmin) / (2 * 1.96)
-        dist_params[var] = (mu, sigma)
-
+    l_bounds = [ranges[v][0] for v in var_names]
+    u_bounds = [ranges[v][1] for v in var_names]
 
     sampler = qmc.LatinHypercube(d=num_vars)
     lhs_samples = sampler.random(n=num_samples) 
 
-
     lv_models = np.zeros((num_samples, num_vars))
     var_names = list(ranges.keys())
 
-    for i, var in enumerate(var_names):
-        mu, sigma = dist_params[var]
-        # Transform using the percent point function (inverse CDF)
-        raw_samples = norm.ppf(lhs_samples[:, i], loc=mu, scale=sigma)
-    
-        # ADDITION: Cap the values exactly at the defined range bounds
-        vmin, vmax = ranges[var]
-        lv_models[:, i] = np.clip(raw_samples, a_min=vmin, a_max=vmax)
-
+    lv_models = qmc.scale(lhs_samples, l_bounds, u_bounds)
     lv_models = np.round(lv_models, decimals=3)
-    with open(os.path.join(cblresearch, "mesh_parameters.csv"), mode='w', newline='') as csvfile:
+
+    with open(os.path.join(cblresearch, "mesh_parameters.csv"), 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(['CaseNum','Radius', 'Height', 'Thickness'])
         for i, row in enumerate(lv_models):
@@ -324,13 +314,15 @@ def generate_all_meshes(params, case_nums, output_root, generate_mesh_gmsh,
         )
 
 if __name__ == "__main__":
-    # params, case_nums = build_param_sweep(num_meshes, dimensions)
-    # generate_all_meshes(params, case_nums, "HOPipeline/3D/MeshCases", generate_mesh_gmsh)
-    #Removes the unneeded .msh files
-    for file in range(0, num_meshes):
+    mesh_params = lhsampler(pig_dimensions["Radius_Lower"], pig_dimensions["Radius_Higher"], pig_dimensions["Height_Lower"], pig_dimensions["Height_Higher"], pig_dimensions["Thickness_Lower"], pig_dimensions["Thickness_Higher"])  # Example parameter ranges
+    
+    for case_num, mesh_param in enumerate(mesh_params):
+        dir_name = os.path.join(cblresearch, f"MeshCasesPig/case_{case_num}")
+        generate_mesh_gmsh(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num, apex_cap_frac=0.3)
+
         try:
-            dir_remove_name = os.path.join(cblresearch, f"MeshCases/case_{file}")
-            os.remove(f"HOPipeline/3D/case_{file}/mesh_{file}.msh")
-            print(f"mesh_{file}.msh removed!")
+            dir_remove_name = os.path.join(cblresearch, f"MeshCasesPig/case_{case_num}")
+            os.remove(f"HOPipeline/3D/MeshCasesPig/case_{case_num}/mesh_{case_num}.msh")
+            print(f"mesh_{case_num}.msh removed!")
         except:
-            print(f"mesh_{file}.msh already removed!")
+            print(f"mesh_{case_num}.msh already removed!")

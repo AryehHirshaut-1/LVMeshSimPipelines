@@ -6,7 +6,8 @@ from scipy.stats import qmc  # Quasi-Monte Carlo submodule
 ranges = {
     'radius': (2.1, 2.95),     # Inner radius
     'height': (5, 12),     # Distance from apex to base
-    'thickness': (0.6, 1.1)    # Myocardial wall thickness
+    'thickness': (0.6, 1.1),    # Myocardial wall thickness
+    'elasticity': (9e5, 1.3e6)
 }
 
 num_samples = 100
@@ -36,7 +37,7 @@ print(lv_models)
 #Plot Generated Parameters
 import matplotlib.pyplot as plt
 
-fig, axes = plt.subplots(2, 3, figsize=(16, 9))
+fig, axes = plt.subplots(2, num_vars, figsize=(16, 9))
 fig.suptitle('Left Ventricle Parameter Analysis (LHS + Gaussian Distribution)', fontsize=16, fontweight='bold')
 
 model_numbers = np.arange(1, num_samples + 1)

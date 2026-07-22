@@ -8,10 +8,6 @@ threed = pd.read_csv("HOPipeline/3D/mesh_parameters.csv", header = 0)
 zerod = pd.read_csv("HOPipeline/0D/0DOutputs.csv", header = 0)
 
 #Create new Columns for Gamma
-threed_gamma = threed["Thickness"]/threed["Radius"]
-threed_HR = threed["Height"]/threed["Radius"]
-
-
 threed["gamma"] = threed["Thickness"]/threed["Radius"]
 threed["HR"] = threed["Height"]/threed["Radius"]
 
@@ -21,54 +17,83 @@ zerod["gammaRank"] = zerod["gamma"].rank()
 threed["HRRank"] = threed["HR"].rank()
 zerod["nRank"] = zerod["n"].rank()
 
+# spearman_coef_gammaR = radius3D["gamma"].corr(radius0D["gamma"])
+spearman_coef_gamma = threed["gamma"].corr(zerod["gamma"])
+spearman_coef_n = threed["HR"].corr(zerod["n"])
+# spearman_coef_nH = height3D["HR"].corr(height0D["n"])
 
-#General Plotting
-radius3D = threed.iloc[:270]
-radius0D = zerod.iloc[:270]
-height3D = threed.iloc[270:540]
-height0D = zerod.iloc[270:540]
-thick3D = threed.iloc[540:]
-thick0D = zerod.iloc[540:]
 
-# print(threed)
+#---------------------------------------
+#-------HR Partitioning By Thickness----
+#---------------------------------------
+lowbound =.47
+highbound=.53
 
-spearman_coef_gammaR = radius3D["gamma"].corr(radius0D["gamma"])
-spearman_coef_gammaT = thick3D["gamma"].corr(thick0D["gamma"])
-spearman_coef_nR = radius3D["HR"].corr(radius0D["n"])
-spearman_coef_nH = height3D["HR"].corr(height0D["n"])
+lowerthick3 = threed[threed["Thickness"] <= lowbound]
+mediumthick3 = threed[(threed["Thickness"] > lowbound) & (threed["Thickness"] <= highbound)]
+highthick3 = threed[threed["Thickness"] > highbound]
+lowerthick0 = zerod.loc[lowerthick3.index]
+mediumthick0 = zerod.loc[mediumthick3.index]
+highthick0 = zerod.loc[highthick3.index]
 
-#Graph Data
+conditions = [
+    threed["Thickness"] <= lowbound,
+    (threed["Thickness"] > lowbound) & (threed["Thickness"] <= highbound),
+    threed["Thickness"] > highbound
+]
+choices = ["Low", "Middle", "High"]
+
+threed["ThicknessGroup"] = np.select(conditions, choices, default="unknown")
+
+spearman_coef_HR_lower = lowerthick3["HR"].corr(lowerthick0["n"])
+spearman_coef_HR_medium = mediumthick3["HR"].corr(mediumthick0["n"])
+spearman_coef_HR_high = highthick3["HR"].corr(highthick0["n"])
+
+
+
+
+
+
+
+
+
+
+#---------------------------------------
+#-------------Graphing Data-------------
+#---------------------------------------
 fig, axs = plt.subplots(2, 2, figsize = (14,6))
 
-colormap = sns.color_palette("crest", as_cmap=True)
+color_map = {"Low": "tab:blue", "Middle": "tab:orange", "High": "tab:red"}
+colors = threed["ThicknessGroup"].map(color_map)
 
-axs[0,0].scatter(thick3D["gamma"], thick0D['gamma'], s=2, label="Thickness", c=thick3D["Radius"], cmap=colormap)
+axs[0,0].scatter(threed["gamma"], zerod['gamma'], s=10)
 axs[0,0].set_xlabel("3D Gamma")
 axs[0,0].set_ylabel("0D Gamma")
-axs[0,0].set_title("Thickness Varied, Colored by Radius")
 
-axs[0,1].scatter(radius3D["gamma"], radius0D["gamma"], s=2, label="Radius", c=radius3D["Thickness"], cmap=colormap)
-axs[0,1].set_xlabel("3D Gamma")
-axs[0,1].set_ylabel("0D Gamma")
-axs[0,1].set_title("Radius Varied, Colored by Thickness")
+axs[0,1].scatter(threed["HR"], zerod["n"], s=10, c=colors)
+axs[0,1].set_xlabel("3D Height/Radius")
+axs[0,1].set_ylabel("0D n")
+handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=c, markersize=8, label=label)
+           for label, c in color_map.items()]
+axs[0,1].legend(handles=handles, title="Thickness Group")
 
-axs[1,0].scatter(radius3D["Height"]/radius3D["Radius"], radius0D['n'], s=2, label="Radius", c=radius3D["Height"], cmap=colormap)
-axs[1,0].set_xlabel("3D Height/Radius")
-axs[1,0].set_ylabel("0D n")
-axs[1,0].set_title("Radius Varied, Colored by Height")
-
-axs[1,1].scatter(height3D["Height"]/height3D["Radius"], height0D['n'], s=2, label="Height", c=height3D["Radius"], cmap=colormap)
-axs[1,1].set_xlabel("3D Height/Radius")
-axs[1,1].set_ylabel("0D n")
-axs[1,1].set_title("Height Varied, Colored by Radius")
+axs[1,0].scatter(threed["gammaRank"], zerod["gammaRank"], s=10)
+axs[1,0].set_xlabel("3D Gamma Rank")
+axs[1,0].set_ylabel("0D Gamma Rank")
+axs[1,0].set_title(f"Spearman Coefficient: {spearman_coef_gamma:.2f}")
 
 #Spearman Correlation Example
-# axs[1,1].scatter(radius3D["HRRank"], radius0D["nRank"], s=2, label="Radius")
-# axs[1,1].scatter(height3D["HRRank"], height0D["nRank"], s=2, label="Height", color="orange")
-# axs[1,1].set_xlabel("3D Height/Radius Rank")
-# axs[1,1].set_ylabel("0D n Rank")
-# axs[1,1].set_title(f"Spearman Coefficient: Radius = {spearman_coef_nR:.2f} Height = {spearman_coef_nH:.2f}")
-# axs[1,1].legend()
+axs[1,1].scatter(threed["HRRank"], zerod["nRank"], s=10, c=colors)
+axs[1,1].set_xlabel("3D Height/Radius Rank")
+axs[1,1].set_ylabel("0D n Rank")
+axs[1,1].set_title(f"Spearman Coefficients")
+handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=c, markersize=8,
+           label=f"{label.capitalize()}: {threed.loc[threed['ThicknessGroup']==label, 'HR'].corr(zerod.loc[threed['ThicknessGroup']==label, 'n'], method='spearman'):.2f}")
+           for label, c in color_map.items()]
+axs[1,1].legend(handles=handles, title="Thickness Group", loc="upper left")
 
-plt.savefig('/users/alanh/Documents/CBLResearch-github/HOPipeline/GammaNCorrelationSweep.png', dpi=300)
-plt.show()
+fig.suptitle('3D-0D Calibration Parameter Fit with Pig Heart Data', fontsize=16, fontweight='bold')
+
+fig.tight_layout()
+plt.savefig('/users/alanh/Documents/CBLResearch-github/HOPipeline/GammaNPigCorrelationSweep.png', dpi=300)
+#plt.show()

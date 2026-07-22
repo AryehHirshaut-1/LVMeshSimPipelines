@@ -11,7 +11,7 @@ from pathlib import Path
 # ============================================================
 # USER SETTINGS
 # ============================================================
-
+file_num = 80
 # Select material model: "NH" or "HO"
 MATERIAL_MODEL = "HO"
 
@@ -419,7 +419,7 @@ with open(file_path, "w") as file:
     file.write("gamma,n\n")
 
 
-CSV_PATH = f"{folderpath}/TPV_0.csv"
+CSV_PATH = f"{folderpath}/TPV_{file_num}.csv"
 
 time, Pout, volume = load_time_pressure_volume_from_csv(CSV_PATH)
 

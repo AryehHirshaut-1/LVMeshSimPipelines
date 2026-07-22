@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-folderpath = Path("/users/alanh/Documents/CBLResearch-github/HOPipeline/3D/VolumeResults810")
+folderpath = Path("/users/alanh/Documents/CBLResearch-github/HOPipeline/3D/VolumeResultsPig")
 filecount = sum(1 for file in folderpath.iterdir() if file.is_file())
 
 
@@ -42,7 +42,7 @@ for file_num in range(0, filecount):
     DAT_PRESSURE_COL = 1
 
     # --- .csv file (volume) from your volume extractor ---
-    CSV_PATH = f"{GeneralFile}/3D/VolumeResults810/lv_volumes_{file_num}.csv"
+    CSV_PATH = f"{GeneralFile}/3D/VolumeResultsPig/lv_volumes_{file_num}.csv"
 
     # If the CSV has a header row with column names, set this to the exact
     # column name. If there's no header, set to None and use CSV_VOLUME_COL_INDEX.
@@ -137,12 +137,12 @@ for file_num in range(0, filecount):
         np.savetxt(
             OUTPUT_PATH,
             combined,
-            fmt="%.10e",
+            fmt="%.2d",
             header="time pressure volume",
             comments="",  # no leading '#' on the header line
         )
     else:
-        np.savetxt(OUTPUT_PATH, combined, fmt="%.10e", delimiter=",")
+        np.savetxt(OUTPUT_PATH, combined, fmt="%.5f", delimiter=",")
 
     print(f"Wrote combined file: {OUTPUT_PATH}")
     # print("Preview of first 3 rows (time, pressure, volume):")

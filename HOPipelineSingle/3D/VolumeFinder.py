@@ -9,7 +9,7 @@ import os
 warnings.filterwarnings('ignore', category=pv.PyVistaFutureWarning)
 
 #Mesh Folder Number (Starts at 0)
-file_num = 0
+file_num = 80
 
 #Change File Paths Accordingly
 general_path = "/users/alanh/Documents/CBLResearch-github/HOPipelineSingle/3D"
@@ -17,10 +17,8 @@ results_path = "MultiPhysicsResults"
 
 def volume_extract(file_num, material_type):
     # Load reference meshes to find endo node indices
-    ref_volume = pv.read(f'{general_path}/case_{file_num}/mesh_{file_num}_volume.vtu')
-    endo_ref = pv.read(f'{general_path}/case_{file_num}/mesh_{file_num}_endo.vtp')
-
-
+    ref_volume = pv.read(f'{general_path}/MeshCasesPig/case_{file_num}/mesh_{file_num}_volume.vtu')
+    endo_ref = pv.read(f'{general_path}/MeshCasesPig/case_{file_num}/mesh_{file_num}_endo.vtp')
 
     ref_points = np.round(ref_volume.points, 4)
     endo_points = np.round(endo_ref.points, 4)
@@ -45,7 +43,6 @@ def volume_extract(file_num, material_type):
     files = sorted(glob.glob(f'{general_path}/{results_path}/Result_*.vtu'))
 
     volumes = []
-
     for f in files:
         mesh = pv.read(f)
 
