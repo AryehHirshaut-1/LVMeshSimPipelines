@@ -48,7 +48,18 @@ pig_dimensions = {
     "Elasticity_Higher": 1.3e6
 }
 
-num_meshes = 100
+pig_dimensions_failure = {
+    "Radius_Lower": 2.47,
+    "Radius_Higher": 2.55,
+    "Height_Lower": 7.57,
+    "Height_Higher": 7.85,
+    "Thickness_Lower": 0.47,
+    "Thickness_Higher": 0.5,
+    "Elasticity_Lower": 1.1e6,
+    "Elasticity_Higher": 1.11e6
+}
+
+num_meshes = 30
 
 #General Path to Generated Mesh Directory
 cblresearch = "NHPipeline/3D"
@@ -257,29 +268,33 @@ def lhsampler(radrangelow, radrangehigh, heightrangelow, heightrangehigh, thickn
     return lv_models_round
 
 if __name__ == "__main__":
-    #mesh_params = lhsampler(dimensions["Radius_Lower"], dimensions["Radius_Higher"], dimensions["Height_Lower"], dimensions["Height_Higher"], dimensions["Thickness_Lower"], dimensions["Thickness_Higher"], dimensions["Elasticity_Lower"], dimensions["Elasticity_Higher"])  # Example parameter ranges
+    mesh_params = lhsampler(pig_dimensions_failure["Radius_Lower"], pig_dimensions_failure["Radius_Higher"], 
+                            pig_dimensions_failure["Height_Lower"], pig_dimensions_failure["Height_Higher"], 
+                            pig_dimensions_failure["Thickness_Lower"], pig_dimensions_failure["Thickness_Higher"], 
+                            pig_dimensions_failure["Elasticity_Lower"], pig_dimensions_failure["Elasticity_Higher"],
+                            )  # Example parameter ranges
     df = pd.read_csv(os.path.join(cblresearch, "mesh_parameters.csv"))
     df['Sphericity'] = df['Height'] / (df['Radius'] * 2)
     df["Sphericity"] = df['Sphericity'].round(2)
     df.to_csv(os.path.join(cblresearch, "mesh_parameters.csv"), index=False)
     
-    # for case_num, mesh_param in enumerate(mesh_params):
-    #     dir_name = os.path.join(cblresearch, f"MeshCasesPig/case_{case_num}")
-    #     generate_mesh_gmsh(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num, apex_cap_frac=0.3)
-    #     mesh = pv.read(f'NHPipeline/3D/MeshCasesPig/case_{case_num}/mesh_{case_num}_volume.vtu')
-    #     mesh.cell_data["ElasticityModulus"] = mesh_param[3]
-    #     mesh.save(f'NHPipeline/3D/MeshCasesPig/case_{case_num}/mesh_{case_num}_volume.vtu')
+    for case_num, mesh_param in enumerate(mesh_params):
+        dir_name = os.path.join(cblresearch, f"MeshCasesPig/case_{case_num}")
+        generate_mesh_gmsh(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num, apex_cap_frac=0.3)
+        mesh = pv.read(f'NHPipeline/3D/MeshCasesPig/case_{case_num}/mesh_{case_num}_volume.vtu')
+        mesh.cell_data["ElasticityModulus"] = mesh_param[3]
+        mesh.save(f'NHPipeline/3D/MeshCasesPig/case_{case_num}/mesh_{case_num}_volume.vtu')
 
-    #     print("Point Data Keys:", mesh.point_data.keys())
-    #     print("Cell Data Keys: ", mesh.cell_data.keys())
-    #     print("Field Data Keys:", mesh.field_data.keys())
+        print("Point Data Keys:", mesh.point_data.keys())
+        print("Cell Data Keys: ", mesh.cell_data.keys())
+        print("Field Data Keys:", mesh.field_data.keys())
     
-    #     try:
-    #         dir_remove_name = os.path.join(cblresearch, f"MeshCasesPig/case_{case_num}")
-    #         os.remove(f"NHPipeline/3D/MeshCasesPig/case_{case_num}/mesh_{case_num}.msh")
-    #         print(f"mesh_{case_num}.msh removed!")
-    #     except:
-    #         print(f"mesh_{case_num}.msh already removed!")
+        try:
+            dir_remove_name = os.path.join(cblresearch, f"MeshCasesPig/case_{case_num}")
+            os.remove(f"NHPipeline/3D/MeshCasesPig/case_{case_num}/mesh_{case_num}.msh")
+            print(f"mesh_{case_num}.msh removed!")
+        except:
+            print(f"mesh_{case_num}.msh already removed!")
 
-    # mesh = pv.read(f'NHPipeline/3D/MeshCasesPig/case_0/mesh_0_volume.vtu')
-    # print(mesh.array_names)
+    mesh = pv.read(f'NHPipeline/3D/MeshCasesPig/case_0/mesh_0_volume.vtu')
+    print(mesh.array_names)

@@ -39,7 +39,7 @@ PLOT_FITTED_MODEL_VS_DATA = False
 FIT_BRANCH = "all"
 
 # Toggle to also estimate material parameters
-OPTIMIZE_MATERIAL_PARAMS = False
+OPTIMIZE_MATERIAL_PARAMS = True
 
 # Include eta in the material-parameter optimization for the selected model.
 # IMPORTANT: eta is only meaningful if the time scale and dV/dt are reliable.

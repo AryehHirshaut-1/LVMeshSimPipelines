@@ -27,18 +27,18 @@
 
 <Add_mesh name="msh" > 
 
-  <Mesh_file_path> MeshCasesPig/case_0/mesh_0_volume.vtu </Mesh_file_path>
+  <Mesh_file_path> MeshCasesPig/case_1/mesh_1_volume.vtu </Mesh_file_path>
 
   <Add_face name="endo">
-      <Face_file_path> MeshCasesPig/case_0/mesh_0_endo.vtp </Face_file_path>
+      <Face_file_path> MeshCasesPig/case_1/mesh_1_endo.vtp </Face_file_path>
   </Add_face>
 
   <Add_face name="epi">
-      <Face_file_path> MeshCasesPig/case_0/mesh_0_epi.vtp </Face_file_path>
+      <Face_file_path> MeshCasesPig/case_1/mesh_1_epi.vtp </Face_file_path>
   </Add_face>
 
   <Add_face name="base">
-      <Face_file_path> MeshCasesPig/case_0/mesh_0_base.vtp </Face_file_path>
+      <Face_file_path> MeshCasesPig/case_1/mesh_1_base.vtp </Face_file_path>
   </Add_face>
 
 </Add_mesh>
