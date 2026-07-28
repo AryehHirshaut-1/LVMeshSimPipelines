@@ -4,6 +4,9 @@ import pyvista as pv
 import os
 from scipy.spatial import cKDTree
 
+#Add Sphericity
+import pandas as pd
+
 #Create finer Volume Meshes
 import gmsh
 import meshio
@@ -29,14 +32,16 @@ dimensions = {
     "Height_Higher": 12,
     "Thickness_Lower": 0.6,
     "Thickness_Higher": 1.1,
+    "Elasticity_Lower": 9e5,
+    "Elasticity_Higher": 1.3e6
 }
 
 #Dimensions from Meissner et al (2024)
 pig_dimensions = {
-    "Radius_Lower": 2.3,
-    "Radius_Higher": 2.98,
-    "Height_Lower": 7.0,
-    "Height_Higher": 9.2,
+    "Radius_Lower": 2.47,
+    "Radius_Higher": 2.8,
+    "Height_Lower": 7.57,
+    "Height_Higher": 8.65,
     "Thickness_Lower": 0.4,
     "Thickness_Higher": 0.6,
     "Elasticity_Lower": 9e5,
@@ -251,87 +256,30 @@ def lhsampler(radrangelow, radrangehigh, heightrangelow, heightrangehigh, thickn
             writer.writerow([i] + row.tolist())
     return lv_models_round
 
-def build_param_sweep(num_meshes, dimensions):
-    # num_meshes should be divisible by 27 (3 params x 9 combos each)
-    n_third = num_meshes // 27  # points per sweep block
-
-    radiusRange    = np.linspace(dimensions["Radius_Lower"],    dimensions["Radius_Higher"],    n_third)
-    heightRange    = np.linspace(dimensions["Height_Lower"],    dimensions["Height_Higher"],    n_third)
-    thicknessRange = np.linspace(dimensions["Thickness_Lower"], dimensions["Thickness_Higher"], n_third)
-
-    # 3 "held fixed" levels per parameter -> 3x3 = 9 combos per varied param
-    radius_fixed    = np.array([2.1, 2.5, 2.95])
-    height_fixed    = np.array([5.0, 8.5, 12])
-    thickness_fixed = np.array([0.6, 0.85, 1.1])
-
-    def block(vary_range, r, h, t):
-        """r, h, t: scalars or arrays (length n_third). Whichever is `vary_range`
-        replaces the corresponding fixed value."""
-        return np.column_stack([
-            vary_range if r is None else np.full(n_third, r),
-            vary_range if h is None else np.full(n_third, h),
-            vary_range if t is None else np.full(n_third, t),
-        ])
-
-    blocks = []
-
-    # Radius varied: sweep radius, hold height & thickness at each of 9 combos
-    for h, t in itertools.product(height_fixed, thickness_fixed):
-        blocks.append(block(radiusRange, None, h, t))
-
-    # Height varied: sweep height, hold radius & thickness
-    for r, t in itertools.product(radius_fixed, thickness_fixed):
-        blocks.append(block(heightRange, r, None, t))
-
-    # Thickness varied: sweep thickness, hold radius & height
-    for r, h in itertools.product(radius_fixed, height_fixed):
-        blocks.append(block(thicknessRange, r, h, None))
-
-    params = np.vstack(blocks)          # shape (27 * n_third, 3)
-    case_nums = np.arange(params.shape[0])
-    
-
-    variable_csv = np.column_stack((case_nums, params))
-    np.savetxt('HOPipeline/3D/mesh_parameters.csv', variable_csv, delimiter=',',
-            header='CaseNum,Radius,Height,Thickness', comments='', fmt="%.3f")
-
-    return params, case_nums
-
-def generate_all_meshes(params, case_nums, output_root, generate_mesh_gmsh,
-                         layers_through_wall=3, apex_cap_frac=0.3):
-    """
-    params: (N, 3) array of [radius, height, thickness]
-    case_nums: (N,) array of case indices
-    """
-    log_rows = []
-
-    for case_num, (radius, height, thickness) in zip(case_nums, params):
-        run_id = f"{case_num}"
-        case_dir = os.path.join(output_root, run_id)
-        os.makedirs(case_dir, exist_ok=True)
-
-        generate_mesh_gmsh(
-            ab_in=radius,
-            c_in=height,
-            thickness=thickness,
-            output_dir=case_dir,
-            run_id=run_id,
-            layers_through_wall=layers_through_wall,
-            apex_cap_frac=apex_cap_frac,
-        )
-
 if __name__ == "__main__":
-    mesh_params = lhsampler(pig_dimensions["Radius_Lower"], pig_dimensions["Radius_Higher"], pig_dimensions["Height_Lower"], pig_dimensions["Height_Higher"], pig_dimensions["Thickness_Lower"], pig_dimensions["Thickness_Higher"], pig_dimensions["Elasticity_Lower"], pig_dimensions["Elasticity_Higher"])  # Example parameter ranges
+    #mesh_params = lhsampler(dimensions["Radius_Lower"], dimensions["Radius_Higher"], dimensions["Height_Lower"], dimensions["Height_Higher"], dimensions["Thickness_Lower"], dimensions["Thickness_Higher"], dimensions["Elasticity_Lower"], dimensions["Elasticity_Higher"])  # Example parameter ranges
+    df = pd.read_csv(os.path.join(cblresearch, "mesh_parameters.csv"))
+    df['Sphericity'] = df['Height'] / (df['Radius'] * 2)
+    df["Sphericity"] = df['Sphericity'].round(2)
+    df.to_csv(os.path.join(cblresearch, "mesh_parameters.csv"), index=False)
     
-    for case_num, mesh_param in enumerate(mesh_params):
-        dir_name = os.path.join(cblresearch, f"MeshCasesPig/case_{case_num}")
-        generate_mesh_gmsh(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num, apex_cap_frac=0.3)
-        mesh = pv.read(f'MeshCasesPig/case_{case_num}/mesh_{case_num}_volume.vtu')
-        mesh.cell_data["ElasticityModulus"] = mesh_param[3]
+    # for case_num, mesh_param in enumerate(mesh_params):
+    #     dir_name = os.path.join(cblresearch, f"MeshCasesPig/case_{case_num}")
+    #     generate_mesh_gmsh(mesh_param[0], mesh_param[1], mesh_param[2], dir_name, case_num, apex_cap_frac=0.3)
+    #     mesh = pv.read(f'NHPipeline/3D/MeshCasesPig/case_{case_num}/mesh_{case_num}_volume.vtu')
+    #     mesh.cell_data["ElasticityModulus"] = mesh_param[3]
+    #     mesh.save(f'NHPipeline/3D/MeshCasesPig/case_{case_num}/mesh_{case_num}_volume.vtu')
+
+    #     print("Point Data Keys:", mesh.point_data.keys())
+    #     print("Cell Data Keys: ", mesh.cell_data.keys())
+    #     print("Field Data Keys:", mesh.field_data.keys())
     
-        try:
-            dir_remove_name = os.path.join(cblresearch, f"MeshCasesPig/case_{case_num}")
-            os.remove(f"NHPipeline/3D/MeshCases/case_{case_num}/mesh_{case_num}.msh")
-            print(f"mesh_{case_num}.msh removed!")
-        except:
-            print(f"mesh_{case_num}.msh already removed!")
+    #     try:
+    #         dir_remove_name = os.path.join(cblresearch, f"MeshCasesPig/case_{case_num}")
+    #         os.remove(f"NHPipeline/3D/MeshCasesPig/case_{case_num}/mesh_{case_num}.msh")
+    #         print(f"mesh_{case_num}.msh removed!")
+    #     except:
+    #         print(f"mesh_{case_num}.msh already removed!")
+
+    # mesh = pv.read(f'NHPipeline/3D/MeshCasesPig/case_0/mesh_0_volume.vtu')
+    # print(mesh.array_names)

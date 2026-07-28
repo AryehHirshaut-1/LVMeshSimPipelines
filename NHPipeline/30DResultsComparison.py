@@ -26,35 +26,28 @@ spearman_coef_n = threed["HR"].corr(zerod["n"])
 #---------------------------------------
 #-------HR Partitioning By Thickness----
 #---------------------------------------
-lowbound =.47
-highbound=.53
+# lowbound =.47
+# highbound=.53
 
-lowerthick3 = threed[threed["Thickness"] <= lowbound]
-mediumthick3 = threed[(threed["Thickness"] > lowbound) & (threed["Thickness"] <= highbound)]
-highthick3 = threed[threed["Thickness"] > highbound]
-lowerthick0 = zerod.loc[lowerthick3.index]
-mediumthick0 = zerod.loc[mediumthick3.index]
-highthick0 = zerod.loc[highthick3.index]
+# lowerthick3 = threed[threed["Thickness"] <= lowbound]
+# mediumthick3 = threed[(threed["Thickness"] > lowbound) & (threed["Thickness"] <= highbound)]
+# highthick3 = threed[threed["Thickness"] > highbound]
+# lowerthick0 = zerod.loc[lowerthick3.index]
+# mediumthick0 = zerod.loc[mediumthick3.index]
+# highthick0 = zerod.loc[highthick3.index]
 
-conditions = [
-    threed["Thickness"] <= lowbound,
-    (threed["Thickness"] > lowbound) & (threed["Thickness"] <= highbound),
-    threed["Thickness"] > highbound
-]
-choices = ["Low", "Middle", "High"]
+# conditions = [
+#     threed["Thickness"] <= lowbound,
+#     (threed["Thickness"] > lowbound) & (threed["Thickness"] <= highbound),
+#     threed["Thickness"] > highbound
+# ]
+# choices = ["Low", "Middle", "High"]
 
-threed["ThicknessGroup"] = np.select(conditions, choices, default="unknown")
+# threed["ThicknessGroup"] = np.select(conditions, choices, default="unknown")
 
-spearman_coef_HR_lower = lowerthick3["HR"].corr(lowerthick0["n"])
-spearman_coef_HR_medium = mediumthick3["HR"].corr(mediumthick0["n"])
-spearman_coef_HR_high = highthick3["HR"].corr(highthick0["n"])
-
-
-
-
-
-
-
+# spearman_coef_HR_lower = lowerthick3["HR"].corr(lowerthick0["n"])
+# spearman_coef_HR_medium = mediumthick3["HR"].corr(mediumthick0["n"])
+# spearman_coef_HR_high = highthick3["HR"].corr(highthick0["n"])
 
 
 
@@ -63,19 +56,19 @@ spearman_coef_HR_high = highthick3["HR"].corr(highthick0["n"])
 #---------------------------------------
 fig, axs = plt.subplots(2, 2, figsize = (14,6))
 
-color_map = {"Low": "tab:blue", "Middle": "tab:orange", "High": "tab:red"}
-colors = threed["ThicknessGroup"].map(color_map)
+# color_map = {"Low": "tab:blue", "Middle": "tab:orange", "High": "tab:red"}
+# colors = threed["ThicknessGroup"].map(color_map)
 
 axs[0,0].scatter(threed["gamma"], zerod['gamma'], s=10)
 axs[0,0].set_xlabel("3D Gamma")
 axs[0,0].set_ylabel("0D Gamma")
 
-axs[0,1].scatter(threed["HR"], zerod["n"], s=10, c=colors)
+axs[0,1].scatter(threed["HR"], zerod["n"], s=10)
 axs[0,1].set_xlabel("3D Height/Radius")
 axs[0,1].set_ylabel("0D n")
-handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=c, markersize=8, label=label)
-           for label, c in color_map.items()]
-axs[0,1].legend(handles=handles, title="Thickness Group")
+# handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=c, markersize=8, label=label)
+#            for label, c in color_map.items()]
+# axs[0,1].legend(handles=handles, title="Thickness Group")
 
 axs[1,0].scatter(threed["gammaRank"], zerod["gammaRank"], s=10)
 axs[1,0].set_xlabel("3D Gamma Rank")
@@ -83,14 +76,14 @@ axs[1,0].set_ylabel("0D Gamma Rank")
 axs[1,0].set_title(f"Spearman Coefficient: {spearman_coef_gamma:.2f}")
 
 #Spearman Correlation Example
-axs[1,1].scatter(threed["HRRank"], zerod["nRank"], s=10, c=colors)
+axs[1,1].scatter(threed["HRRank"], zerod["nRank"], s=10)
 axs[1,1].set_xlabel("3D Height/Radius Rank")
 axs[1,1].set_ylabel("0D n Rank")
-axs[1,1].set_title(f"Spearman Coefficients")
-handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=c, markersize=8,
-           label=f"{label.capitalize()}: {threed.loc[threed['ThicknessGroup']==label, 'HR'].corr(zerod.loc[threed['ThicknessGroup']==label, 'n'], method='spearman'):.2f}")
-           for label, c in color_map.items()]
-axs[1,1].legend(handles=handles, title="Thickness Group", loc="upper left")
+axs[1,1].set_title(f"Spearman Coefficient: {spearman_coef_n:.2f}")
+# handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=c, markersize=8,
+        #    label=f"{label.capitalize()}: {threed.loc[threed['ThicknessGroup']==label, 'HR'].corr(zerod.loc[threed['ThicknessGroup']==label, 'n'], method='spearman'):.2f}")
+        #    for label, c in color_map.items()]
+# axs[1,1].legend(handles=handles, title="Thickness Group", loc="upper left")
 
 fig.suptitle('3D-0D Calibration Parameter Fit with Pig Heart Data', fontsize=16, fontweight='bold')
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=lv_sensitivity_analysis
-#SBATCH --array=0-809
+#SBATCH --array=0-99
 #SBATCH --nodes=1
 #SBATCH --ntasks=16
 #SBATCH --cpus-per-task=1
@@ -14,7 +14,7 @@ module load Python/3.12.3-GCCcore-13.3.0
 set -euo pipefail
 
 # Activate your virtual environment
-source ~/NHPipeline/3D/14/bin/activate
+source ~/NHPipeline/3D/NH14/bin/activate
 
 # ===== EDIT FOR YOUR CLUSTER =====================================
 WORKDIR="$HOME/NHPipeline/3D"
@@ -26,6 +26,8 @@ import pyvista as pv
 mesh = pv.read('MeshCasesPig/case_${i}/mesh_${i}_volume.vtu')
 print(mesh.cell_data['ElasticityModulus'][0])
 ")
+
+echo "Mesh Elasticity Modulus: ${modulus}"
 
 cd "$WORKDIR"
 mkdir -p inputs logs "results/case_${i}"
@@ -39,7 +41,7 @@ mpirun -np 3 svmultiphysics "$XML"
 
 echo "[case ${i}] done  $(date) -> results/case_${i}/"
 
-source 14/bin/activate
+source NH14/bin/activate
 
 # Volume extraction for this case only
 python3 "$WORKDIR/VolumeFinder.py" \

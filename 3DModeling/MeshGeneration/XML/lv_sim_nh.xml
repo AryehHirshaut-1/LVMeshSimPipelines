@@ -55,9 +55,11 @@
    <Density> 1.0 </Density>                           <!-- g/cm^3 -->
    <Elasticity_modulus> 1.0e6 </Elasticity_modulus>   <!-- dyne/cm^2 -->
    <Poisson_ratio> 0.48 </Poisson_ratio>
+
    <Constitutive_model type="neoHookean"> 
       </Constitutive_model> 
    <Dilational_penalty_model> ST91 </Dilational_penalty_model>
+   <Penalty_parameter>1.0e7</Penalty_parameter>
 
 
 

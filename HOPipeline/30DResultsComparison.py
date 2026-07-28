@@ -51,13 +51,6 @@ spearman_coef_HR_high = highthick3["HR"].corr(highthick0["n"])
 
 
 
-
-
-
-
-
-
-
 #---------------------------------------
 #-------------Graphing Data-------------
 #---------------------------------------
@@ -96,4 +89,4 @@ fig.suptitle('3D-0D Calibration Parameter Fit with Pig Heart Data', fontsize=16,
 
 fig.tight_layout()
 plt.savefig('/users/alanh/Documents/CBLResearch-github/HOPipeline/GammaNPigCorrelationSweep.png', dpi=300)
-#plt.show()
+plt.show()

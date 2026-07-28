@@ -18,7 +18,7 @@ def volume_extract(file_num, general_path, mesh_path, results_path, output_path)
                             if tuple(p) in endo_set])
     print(f"[case {file_num}] Found {len(endo_indices)} endo nodes")
 
-    files = sorted(glob.glob(f'{general_path}/{results_path}/case_{file_num}/result_HO*.vtu'))
+    files = sorted(glob.glob(f'{general_path}/{results_path}/case_{file_num}/result_NH*.vtu'))
 
     volumes = []
     for f in files:

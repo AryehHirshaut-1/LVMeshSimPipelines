@@ -27,22 +27,22 @@
 
 <Add_mesh name="msh" > 
 
-  <Mesh_file_path> MeshCasesPig/case_80/mesh_80_volume.vtu </Mesh_file_path>
+  <Mesh_file_path> MeshCasesPig/case_0/mesh_0_volume.vtu </Mesh_file_path>
 
   <Add_face name="endo">
-      <Face_file_path> MeshCasesPig/case_80/mesh_80_endo.vtp </Face_file_path>
+      <Face_file_path> MeshCasesPig/case_0/mesh_0_endo.vtp </Face_file_path>
   </Add_face>
 
   <Add_face name="epi">
-      <Face_file_path> MeshCasesPig/case_80/mesh_80_epi.vtp </Face_file_path>
+      <Face_file_path> MeshCasesPig/case_0/mesh_0_epi.vtp </Face_file_path>
   </Add_face>
 
   <Add_face name="base">
-      <Face_file_path> MeshCasesPig/case_80/mesh_80_base.vtp </Face_file_path>
+      <Face_file_path> MeshCasesPig/case_0/mesh_0_base.vtp </Face_file_path>
   </Add_face>
 
-  <Fiber_direction_file_path> MeshCasesPig/case_80/mesh_80_fibers/fiber.vtu </Fiber_direction_file_path>
-  <Fiber_direction_file_path> MeshCasesPig/case_80/mesh_80_fibers/normal.vtu  </Fiber_direction_file_path>
+  <Fiber_direction_file_path> MeshCasesPig/case_0/mesh_0_fibers/fiber.vtu </Fiber_direction_file_path>
+  <Fiber_direction_file_path> MeshCasesPig/case_0/mesh_0_fibers/normal.vtu  </Fiber_direction_file_path>
 
 </Add_mesh>
 
@@ -65,7 +65,7 @@
    <Constitutive_model type="HolzapfelOgden">  <!-- MEAN OPTIMISED PARAMETERS FROM  -->
      <a> 14720.0 </a>                                   <!-- dyne/cm^2 -->
      <b> 33.39 </b>                                   <!-- no units -->
-     <a4f> 30080.0 </a4f>
+     <a4f> 3000.0 </a4f>
      <b4f> 88.39 </b4f>
      <a4s> 9420.0 </a4s>
      <b4s> 14.30 </b4s>

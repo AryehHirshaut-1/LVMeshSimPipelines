@@ -52,15 +52,17 @@
    <Max_iterations> 10 </Max_iterations>
    <Tolerance> 1e-5 </Tolerance>
 
-   <Density> 1.0 </Density>                           <!-- g/cm^3 -->
-   <Elasticity_modulus> ELAS_MOD </Elasticity_modulus>   <!-- dyne/cm^2 -->
-   <Poisson_ratio> 0.48 </Poisson_ratio>
+   <Density> 1.0 </Density>                       <!-- g/cm^3 -->
+
    <Constitutive_model type="neoHookean">
-      </Constitutive_model>
+      <Elasticity_modulus> ELAS_MOD </Elasticity_modulus>   <!-- dyne/cm^2 -->
+      <Poisson_ratio> 0.48 </Poisson_ratio>
+   </Constitutive_model>
+
    <Dilational_penalty_model> ST91 </Dilational_penalty_model>
+   <Penalty_parameter>1.0e7</Penalty_parameter>
 
-
-    <Output type="Spatial" >
+   <Output type="Spatial" >
      <Displacement> true </Displacement>
      <Velocity> true </Velocity>
      <Jacobian> false </Jacobian>
@@ -89,7 +91,7 @@
       <Type> Neu </Type>
       <Time_dependence> Unsteady </Time_dependence>
       <Temporal_values_file_path> lv_pressure.dat </Temporal_values_file_path> <!-- dyne/cm^2 -->
-      <Ramp_function> true </Ramp_function>
+      <Ramp_function> false </Ramp_function>
       <Follower_pressure_load> true </Follower_pressure_load>
    </Add_BC>
 
